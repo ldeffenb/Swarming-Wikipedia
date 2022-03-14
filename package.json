@@ -1,0 +1,33 @@
+{
+  "name": "swarming-wikipedia",
+  "version": "1.0.0",
+  "description": "A TypeScript-based tool to upload a Wikipedia snapshot to the swarm, limited only by the size of your stamp, not the size of the snapshot.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "build2": "tsc --downLevelIteration",
+    "run": "npm run build && node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ldeffenb/Swarming-Wikipedia.git"
+  },
+  "keywords": [],
+  "author": "Lynn W. Deffenbaugh",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ldeffenb/Swarming-Wikipedia/issues"
+  },
+  "homepage": "https://github.com/ldeffenb/Swarming-Wikipedia#readme",
+  "devDependencies": {
+    "@types/node": "^17.0.21",
+    "typescript": "^4.6.2"
+  },
+  "dependencies": {
+    "@ethersphere/bee-js": "^1.2.0",
+    "axios": "^0.26.1",
+    "mantaray-js": "github:ldeffenb/mantaray-js",
+    "mime-types": "^2.1.34"
+  }
+}
