@@ -13,9 +13,9 @@ inability to use, or your interaction with other nodes or the software.
 
 The Swarming-Wikipedia tool is designed to be built into and executed from a Docker container file.  To prepare the tool for use:
 
-1. git clone https://github.com/ldeffenb/Swarming-Wikipedia.git
-2. cd Swarming-Wikipedia
-3. docker build --tag swarming-wikipedia .
+1. `git clone https://github.com/ldeffenb/Swarming-Wikipedia.git`
+2. `cd Swarming-Wikipedia`
+3. `docker build --tag swarming-wikipedia .`
 
 ## Usage
 
@@ -27,19 +27,19 @@ where:
 - `beeNodeURL` is the URL for a suitable bee node's API port
 - `usableStampBatch` is the stamp batch to pay for the upload
 
-You can select a Wikipedia Archive from the [master list](https://download.kiwix.org/zim/wikipedia/) list at the following URL.  The following URL is the required one to use for the We Are Millions bounty.
+You can select any Wikipedia Archive from the [kiwix.org master list](https://download.kiwix.org/zim/wikipedia/).  The following URL is the required one to use for the We Are Millions bounty.
 
-https://download.kiwix.org/zim/wikipedia/wikipedia_bm_all_maxi_2022-02.zim
+`https://download.kiwix.org/zim/wikipedia/wikipedia_bm_all_maxi_2022-02.zim`
 
-If you are running a bee node on IP address 192.168.10.8, then `beeNodeURL` could be http://192.168.10.8:1633.  Remember, this URL must be accessible to a process running inside the Docker container, so it is likely that neither http://127.0.0.1:1633 nor http://localhost:1633 will work.
+If you are running a bee node on IP address `192.168.10.8`, then `beeNodeURL` could be `http://192.168.10.8:1633`.  Remember, this URL must be accessible to a process running inside the Docker container, so it is likely that neither `http://127.0.0.1:1633` nor `http://localhost:1633` will work.
 
-You can verify a `stampBatch` usability with something like (assuming your bee node is running on 192.168.10.8 and has the default Debug API address enabled):
+You can verify a `stampBatch` usability with something like (assuming your bee node is running on `192.168.10.8` and has the default Debug API address enabled):
 
 `curl http://192.168.10.8:1635/stamps | jq`
 
 The Swarming-Wikipedia tool will provide some status feedback as it executes.  The time required will depend mostly on the size of the .ZIM file being pushed to the swarm.  When the tool has finished, a final log line similar to the following will be shown.  The URL in this log can be used to access the uploaded archive from the node through which it was uploaded.
 
-`View your archive at http://192.168.10.8:1633/bzz/9aafea948007399891290fc3b294fdfbbf7f51313111dd20ba2bb6ff2a1ecd27'
+`View your archive at http://192.168.10.8:1633/bzz/9aafea948007399891290fc3b294fdfbbf7f51313111dd20ba2bb6ff2a1ecd27`
 
 Note that due to propagation variations in the swarm, a freshly uploaded archive may not be immediately accessible from other nodes in the swarm.  If you encounter errors accessing the archive, wait a while to give the upload time to propagate.
 
@@ -49,7 +49,7 @@ The Swarming-Wikipedia tool works at a high level by doing the following via get
 
 1. Use wget to download the specified zimURL to archive.zim
 2. Use [zimdump](https://github.com/openzim/zim-tools) to extract archive.zim to the archive subdirectory
-3. Activates node.js to execute a compiled TypeScript which does the actual uploading
+3. Activate node.js to execute a compiled TypeScript which does the actual uploading
 
 The Swarming-Wikipedia TypeScript does the following
 
@@ -69,6 +69,8 @@ The Swarming-Wikipedia TypeScript does the following
 - A custom index-redirect.html is created in the root of the collection and set as the default file to redirect to A/index which is assumed to be the actual archive entry point.
 - Files that zimdump puts into the _exceptions directory are added as references to their originally specified directory.  This happens when the archive contains a file and a directory that share the same name.  I'm not 100% certain that swarm's manifest handles this properly, but I do it anyway.
 - All uploaded chunks are pinned in the uploading node, so the entire collection should always be visible via the /bzz URL at that node.
+- The tool (without zimdump and directly executing the [TS component](src/index.ts)) can also upload any arbitrary directory tree of files to the swarm, with a code-able default entry point which defaults to index.html.
+- For advanced interest, there is code in the tool that can dump the contents of a mantaray manifest from the swarm, again using just the [TS component](src/index.ts).
 
 ## License
 

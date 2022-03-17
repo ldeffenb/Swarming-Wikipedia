@@ -807,16 +807,17 @@ async function doit(srcDir: string) {
 //	showBoth(`Uploaded ${srcDir} as ${rootNode}`)
 	
 //	For uploading a Wikipedia archive with A/index
-//	const rootNode = await newManifest(saveFunction, srcDir, "A/index")
-//	showBoth(`Uploaded ${srcDir} as ${rootNode}`)
+	const rootNode = await newManifest(saveFunction, srcDir, "A/index")
+	showBoth(`Uploaded ${srcDir} as ${rootNode}`)
 	
-	const rootNode = "9aafea948007399891290fc3b294fdfbbf7f51313111dd20ba2bb6ff2a1ecd27"
+//	You can define your own root reference for dumping purposes if desired
+//	const rootNode = "9aafea948007399891290fc3b294fdfbbf7f51313111dd20ba2bb6ff2a1ecd27"
 
-//	This will dump out the uploaded manifest
-	await dumpManifest(loadFunction, rootNode, srcDir, undefined, undefined, false, true, false)
+//	This will dump out the uploaded manifest for diagnostic purposes
+//	await dumpManifest(loadFunction, rootNode, srcDir, undefined, undefined, false, true, false)
 
-	showBoth(`View your archive at ${beeUrl}/bzz/${rootNode}`)
 	showBoth(`TAG information may be viewed using curl ${beeUrl}/tags/${tagID} | jq`)
+	showBoth(`View your archive at ${beeUrl}/bzz/${rootNode}`)
 }
 
 try {
