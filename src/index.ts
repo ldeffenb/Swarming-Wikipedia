@@ -314,7 +314,7 @@ async function monitorTag(ID : number) : Promise<boolean> {
 			//const tag = await bee.retrieveTag(ID)
 			const tag = await executeAPI(beeUrl, 'tags', `${ID}`)
 			
-			const text = `TAG ${ID} ${tag.synced}/${tag.processed}/${tag.total} p:${tag.total-tag.processed} s:${tag.processed-tag.synced}`
+			const text = `TAG ${ID} sync:${tag.synced} proc:${tag.processed} total:${tag.total} procPend:${tag.total-tag.processed} syncPend:${tag.processed-tag.synced}`
 			if (!lastTag || !lastText || lastText != text) {
 				showTopLine(text)
 				lastText = text
@@ -816,6 +816,7 @@ async function doit(srcDir: string) {
 	await dumpManifest(loadFunction, rootNode, srcDir, undefined, undefined, false, true, false)
 
 	showBoth(`View your archive at ${beeUrl}/bzz/${rootNode}`)
+	showBoth(`TAG information may be viewed using curl ${beeUrl}/tags/${tagID} | jq`)
 }
 
 try {
