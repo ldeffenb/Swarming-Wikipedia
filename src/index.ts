@@ -376,7 +376,6 @@ async function saveManifest(storageSaver: StorageSaver, node: MantarayNode, pref
 	if (!counts) {
 		counts = { processed: 0, total: await countManifest(node) }
 		showBoth(`Saving ${counts.total} manifest nodes`)
-		printStatus(`Saving ${counts.total} manifest nodes`)
 	}
 
 	var myCount = 0
@@ -513,14 +512,51 @@ async function newManifest(storageSaver: StorageSaver, sourcePath: string, index
 	//const node = initManifestNode()	// Only if you want a random obfuscation key
 	const node = new MantarayNode()
 	
-	if (index) {
+	var indexHTML = ""
+	var hasIndex = false
+
+	showBoth(`Counting files and generating index`)
+	var fileCount = 0
+	await (async () => {
+	  for await (const f of getFiles(sourcePath)) {
+		const relPath = relative(sourcePath,f)
+		const posixPath = relPath.split(PATH.sep).join(PATH.posix.sep)
+		if (posixPath.slice(0,2) == 'A/') {	// These are the HTML documents in a zim archive
+			if (index && posixPath == index) hasIndex = true
+			else {
+				const linkPath = posixPath.replace(/%/g, "%25").replace(/\?/g, "%3F").replace(/&/g, "%26").replace(/\"/g, "%22")
+				const visiblePath = posixPath.slice(2).replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/_/g, " ")
+				indexHTML = indexHTML + `<LI><A HREF="${linkPath}">${visiblePath}</A></LI>\n`
+			}
+		}
+		fileCount++
+		const heap = process.memoryUsage()
+		progress = `rss:${Math.floor(heap.rss/1024/1024)}MB heap:${Math.floor(heap.heapUsed/1024/1024)}/${Math.floor(heap.heapTotal/1024/1024)}MB`
+		progress = `Count ${fileCount} ${sourcePath} ${progress}`
+	  }
+	})()
+	
+	if (indexHTML != "") {
+		const header = "<HEAD><style>li {display: block; width: 33%; float: left; line-height: 1.25em;}</style></HEAD>"
+		if (hasIndex) {
+			indexHTML = `<HTML>${header}<BODY><center><H2>For the default ${index}, click <A HREF="${index}">HERE</A></H2><P><UL>${indexHTML}</UL></center></BODY></HTML>`
+		} else {
+			indexHTML = `<HTML>${header}<BODY><center><UL>${indexHTML}</UL></center></BODY></HTML>`
+		}
+		const redirect = `master-index.html`
+		const indexRef = await uploadData(indexHTML, redirect, true)
+		node.addFork(new TextEncoder().encode(redirect), indexRef)
+		index = redirect
+	} else if (hasIndex) {
 		if (index != "index.html") {	// Probably only need to do this if there's a separator in index...
 			const redirect = `index-redirect.html`
 			const indexRef = await uploadData(`<script>location.replace('${index}')</script>`, redirect, true)
 			node.addFork(new TextEncoder().encode(redirect), indexRef)
 			index = redirect
 		}
+	}
 
+	if (index) {
 		const rootMeta = { "website-index-document": index }
 		node.addFork(new TextEncoder().encode('/'), hexToBytes(zeroAddress), rootMeta)
 
@@ -532,20 +568,7 @@ async function newManifest(storageSaver: StorageSaver, sourcePath: string, index
 		rootNode.setType = type
 	}
 	
-	showBoth(`Counting files`)
-	printStatus(`Counting files`)
-	var fileCount = 0
-	await (async () => {
-	  for await (const f of getFiles(sourcePath)) {
-		fileCount++
-		const heap = process.memoryUsage()
-		progress = `rss:${Math.floor(heap.rss/1024/1024)}MB heap:${Math.floor(heap.heapUsed/1024/1024)}/${Math.floor(heap.heapTotal/1024/1024)}MB`
-		progress = `Count ${fileCount} ${sourcePath} ${progress}`
-	  }
-	})()
-
 	showBoth(`Adding ${fileCount} files`)
-	printStatus(`Adding ${fileCount} files`)
 	var didCount = 0
 	await (async () => {
 	  for await (const f of getFiles(sourcePath)) {
@@ -572,7 +595,6 @@ async function newManifest(storageSaver: StorageSaver, sourcePath: string, index
 	const middleTag = await bee.retrieveTag(tagID)
 
 	showBoth(`Saving manifest`)
-	printStatus(`Saving manifest`);
 
 	var start = new Date().getTime()
 	var refCollection = (await saveManifest(storageSaver, node)).reference

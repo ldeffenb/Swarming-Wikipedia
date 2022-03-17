@@ -66,7 +66,7 @@ The Swarming-Wikipedia tool works at a high level by doing the following via get
 
 The Swarming-Wikipedia TypeScript does the following
 
-1. Count all files located in the archive subdirectory
+1. Count all files located in the archive subdirectory simultaneously building an index for A/-resident files
 2. Create a tag to track upload and pusher progress.  This tag is visible on the top line as the upload happens.
 3. Upload each of those files using the [/bytes](https://docs.ethswarm.org/api/#tag/Bytes/paths/~1bytes/post) API via [axios](https://github.com/axios/axios)
 4. Dynamically build a mantaray manifest using [mantaray-js](https://github.com/ethersphere/mantaray-js)
@@ -80,6 +80,7 @@ The Swarming-Wikipedia TypeScript does the following
 - [Axios](https://github.com/axios/axios) was used to allow the API connection to the bee node to be kept alive.  Repeated use of the [bee-js](https://github.com/ethersphere/bee-js) uploadData API generates many TIME_WAIT sockets as a new connection is created for each API invocation.
 - Any extension-less file for which Content-Type cannot be determined is assumed to be text/html if it is located in the A subdirectory.
 - A custom index-redirect.html is created in the root of the collection and set as the default file to redirect to A/index which is assumed to be the actual archive entry point.
+- "Special" characters are handled in the file names to ensure linkability from the generated index as well as to provide a better humanly-readable presentation of the link.  This is more viaible with [wikipedia_en_100_maxi_2022-03.zim](https://download.kiwix.org/zim/wikipedia/wikipedia_en_100_maxi_2022-03.zim).
 - Files that zimdump puts into the _exceptions directory are added as references to their originally specified directory.  This happens when the archive contains a file and a directory that share the same name.  I'm not 100% certain that swarm's manifest handles this properly, but I do it anyway.
 - All uploaded chunks are pinned in the uploading node, so the entire collection should always be visible via the /bzz URL at that node.
 - The tool (without zimdump and directly executing the [TS component](src/index.ts)) can also upload any arbitrary directory tree of files to the swarm, with a code-able default entry point which defaults to index.html.
@@ -98,6 +99,8 @@ https://stackoverflow.com/questions/40873165/use-docker-run-command-to-pass-argu
 https://stackoverflow.com/questions/4341630/checking-for-the-correct-number-of-arguments
 https://wiki.openzim.org/wiki/OpenZIM
 
+and of course to my long time supporting the development of the swarm!
+
 ## Technical Debt (ToDos)
 
 - Error handling is practically non-existant.  Be careful to supply valid arguments when running the container.
@@ -105,3 +108,5 @@ https://wiki.openzim.org/wiki/OpenZIM
 - Upload performance can be increased by paralleling requests.  However, this comes with an increased risk of exceeding the time settlements and actually needing to issue cheques to pay for push data transfers.
 - The /bytes API defaults to deferred uploads.  If a non-deferred upload is selected, then the tool would not complete until the required chunks have been initially distributed to the swarm.
 - The tool is very non-modular (read: a single source file).  It could be modularized for readability and re-use.
+- Better styling of the generated index of A/ documents (currently hard-coded at 3 columns)
+- Remove redundancy of mis-speeled (sic) redirect files in the generated index
