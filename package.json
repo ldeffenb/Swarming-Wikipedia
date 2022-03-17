@@ -25,7 +25,7 @@
     "typescript": "^4.6.2"
   },
   "dependencies": {
-    "@ethersphere/bee-js": "^1.2.0",
+    "@ethersphere/bee-js": "^3.3.1",
     "axios": "^0.26.1",
     "mantaray-js": "github:ldeffenb/mantaray-js",
     "mime-types": "^2.1.34"

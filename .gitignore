@@ -1,5 +1,12 @@
 lib
 
+# Local test data
+*.zim
+archive
+smallArchive
+wikipedia_en_100_maxi_2022-03.zim
+zim-tools_linux-x86_64-3.1.0
+
 # Logs
 logs
 *.log
@@ -25,3 +32,6 @@ dist
 
 # Dependency directory
 node_modules
+
+
+

@@ -11,29 +11,48 @@ import { resolve, relative } from 'path';
 import { readdir } from 'fs/promises';
 import { Dirent } from 'fs';
 
+import http from 'node:http';
+import https from 'node:https';
+const httpAgent = new http.Agent({ keepAlive: true, keepAliveMsecs: 10000, maxSockets: 1000 });
+const httpsAgent = new https.Agent({ keepAlive: true, keepAliveMsecs: 10000, maxSockets: 1000 });
+
 const axios = require('axios')
 axios.default
-const http = require('http');
-const httpAgent = new http.Agent({ keepAlive: true, keepAliveMsecs: 10000, maxSockets: 1000 });
+axios.defaults.httpAgent = httpAgent
+axios.defaults.httpsAgent = httpsAgent
+axios.defaults.timeout = 10000	// Default of 10 second timeout
 
-const nsTestnet1 = { beeUrl: 'http://192.168.10.172:1633',
-				beeDebugUrl: 'http://192.168.10.172:1635',
-				batchID: "c749612363aa9f0345041e24b54e6d177285148ac78356a6b33e468d6b418995" }
+//import { buildAxiosFetch } from '@lifeomic/axios-fetch'
 
-const oldLaptopBee6 = { beeUrl: 'http://192.168.174.61:1533',
-				beeDebugUrl: 'http://192.168.10.174:1535',
-				batchID: "7efb6d7be447cccafd3139407abd4a430e153f17d36084401c623d934532fdcf" }
+//const fetch = buildAxiosFetch(axios)
 
-const useNode = nsTestnet1
+//const fetchOptions = {
+//	agent: function(_parsedURL) {
+//		if (_parsedURL.protocol == 'http:') {
+//			return httpAgent;
+//		} else {
+//			return httpsAgent;
+//		}
+//	}
+//};
 
-const beeUrl = useNode.beeUrl
-const beeDebugUrl = useNode.beeDebugUrl
-const batchID = useNode.batchID
+//process.argv.forEach((val, index) => {
+//  console.log(`${index}: ${val}`)
+//})
 
-const bee = new Bee(beeUrl)
+const beeUrl = process.argv[3]
+const batchID = process.argv[4]
+
+var bee : Bee
+try {
+	bee = new Bee(beeUrl)
+} catch (err) {
+	showBoth(`${err}`)
+}
 
 let tagID = 0
 let progress = ''
+const uploadDelay = 0	// msec to sleep after each upload to give node a chance to breathe (0 to disable)
 
 var exitRequested = false
 
@@ -56,19 +75,26 @@ function showTopLine(text : string)
 
 function showSecondLine(text : string)
 {
+	const save = '\u001b7'
+	const home = '\u001b[H'
+	const down = '\u001bD'
+	const erase = '\u001b[K'
+	const restore = '\u001b8'
 	text = currentLocalTime()+' '+text
 	// Save cursor, Home cursor, Down line, text, Erase to end of line, Restore cursor
-	process.stderr.write('\u001b7'+'\u001b[H'+'\u001bD'+text+'\u001b[K'+'\u001b8')
+	//process.stderr.write('\u001b7'+'\u001b[H'+'\u001bD'+text+'\u001b[K'+'\u001b[H'+'\u001bD'+'\u001bD'+'\u001b[K'+'\u001b8')
+	process.stderr.write(save+home+down+text+erase+home+down+down+erase+restore)
 }
 
 function showError(text : string)
 {
 	//process.stderr.clearLine(1);
-	console.error(currentLocalTime()+' '+text)
+	console.error('\u001b[K'+currentLocalTime()+' '+text)
 }
 
 function showLog(text : string)
 {
+	printStatus(text)
 	console.log(currentLocalTime()+' '+text)
 }
 
@@ -78,22 +104,39 @@ function showBoth(text : string)
 	showError(text)
 }
 
-function printStatus(text : string)
-{
-	showLog(text)
+var pendingStatus:string|undefined = undefined
+
+async function statusPrinter() {
+	await sleep(500)
+	process.stderr.write(pendingStatus+'\u001b[K\r');	// Erase to end of line then return
+//	process.stderr.clearLine(1); process.stderr.cursorTo(0);
+	pendingStatus = undefined
+}
+
+function printStatus(text: string) {
+	if (!pendingStatus) statusPrinter()
+	pendingStatus = text
 }
 
 const hexToBytes = (hexString: string): Reference => {
-  return Utils.Hex.hexToBytes(hexString)
+  return Utils.hexToBytes(hexString)
 }
 
 const bytesToHex = (data: Uint8Array | undefined): string => {
   if (!data) return "*undefined*"
-  return Utils.Hex.bytesToHex(data)
+  return Utils.bytesToHex(data)
 }
 
 function sleep(ms: number) {
 	return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function statusDelay(sec: number) {
+	while (sec > 0) {
+		printStatus(`Delaying ${sec} seconds...`)
+		await sleep(1000)
+		sec--
+	}
 }
 
 var mime = require('mime-types')
@@ -167,7 +210,7 @@ async function* getFiles(dir: string): AsyncGenerator<string> {
     }
 }
 
-async function executeAPI(URL : string, API : string, method : string = 'get', params : string = '', headers : string = '', body : string = '')
+async function executeBinaryAPI(URL : string, API : string, params : string = '', method : string = 'get', headers : any = {}, body : any = '')
 {
 	if (params != '') params = '/'+params
 	
@@ -180,20 +223,70 @@ async function executeAPI(URL : string, API : string, method : string = 'get', p
 	{
 		//showError('Starting '+doing)
 		//var response = await axios({ method: method, url: actualURL, headers: headers, data: body })
-		var response = await axios({ method: method, url: actualURL, headers: headers, data: body, httpAgent: httpAgent })
+		var response = await axios({ method: method, url: actualURL,
+										headers: headers, data: body,
+										responseType: 'arraybuffer',
+										httpAgent: httpAgent,
+										httpsAgent: httpsAgent,
+										maxContentLength: Infinity,
+										maxBodyLength: Infinity })
 	}
 	catch (err:any)
 	{
-		var elapsed = Math.trunc((new Date().getTime() - start)/1000+0.5)
+		var elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
 		if (err.response)
 		{	//showError(actualURL)
-			showError(doing+' '+elapsed+' response error '+err+' with '+JSON.stringify(err.response.data))
+			showError(doing+' '+elapsed+'s response error '+err+' with '+JSON.stringify(err.response.data))
 			//showError(JSON.stringify(err.response.data))
 		} else if (err.request)
-		{	showError(doing+' '+elapsed+' request error '+err)
+		{	showError(doing+' '+elapsed+'s request error '+err)
 			//showError(JSON.stringify(err.request))
 		} else
-		{	showError(doing+' '+elapsed+' other error '+err)
+		{	showError(doing+' '+elapsed+'s other error '+err)
+			//showError(JSON.stringify(err))
+		}
+		throw(err);
+		return void(0)
+	}
+	var elapsed = Math.trunc((new Date().getTime() - start)/1000+0.5)
+	//showError(actualURL+' response.data='+JSON.stringify(response.data))
+	//showError(doing+' '+elapsed+' response.data='+JSON.stringify(response.data))
+
+	return response.data
+}
+
+async function executeAPI(URL : string, API : string, params : string = '', method : string = 'get', headers : any = {}, body : any = '')
+{
+	if (params != '') params = '/'+params
+	
+	var actualURL = URL+'/'+API+params
+	var doing = method+' '+actualURL
+
+	var start = new Date().getTime()
+	
+	try
+	{
+		//showError('Starting '+doing)
+		//var response = await axios({ method: method, url: actualURL, headers: headers, data: body })
+		var response = await axios({ method: method, url: actualURL,
+										headers: headers, data: body,
+										httpAgent: httpAgent,
+										httpsAgent: httpsAgent,
+										maxContentLength: Infinity,
+										maxBodyLength: Infinity })
+	}
+	catch (err:any)
+	{
+		var elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
+		if (err.response)
+		{	//showError(actualURL)
+			showError(doing+' '+elapsed+'s response error '+err+' with '+JSON.stringify(err.response.data))
+			//showError(JSON.stringify(err.response.data))
+		} else if (err.request)
+		{	showError(doing+' '+elapsed+'s request error '+err)
+			//showError(JSON.stringify(err.request))
+		} else
+		{	showError(doing+' '+elapsed+'s other error '+err)
 			//showError(JSON.stringify(err))
 		}
 		throw(err);
@@ -218,7 +311,9 @@ async function monitorTag(ID : number) : Promise<boolean> {
 			break
 		}
 		try {
-			const tag = await bee.retrieveTag(ID)
+			//const tag = await bee.retrieveTag(ID)
+			const tag = await executeAPI(beeUrl, 'tags', `${ID}`)
+			
 			const text = `TAG ${ID} ${tag.synced}/${tag.processed}/${tag.total} p:${tag.total-tag.processed} s:${tag.processed-tag.synced}`
 			if (!lastTag || !lastText || lastText != text) {
 				showTopLine(text)
@@ -261,7 +356,7 @@ async function countManifest(node: MantarayNode, prefix: string = '', indent: st
 		const heap = process.memoryUsage()
 		progress = `Count ${prefix} rss:${Math.floor(heap.rss/1024/1024)}MB heap:${Math.floor(heap.heapUsed/1024/1024)}/${Math.floor(heap.heapTotal/1024/1024)}MB`
 		showSecondLine(progress)
-		printStatus(`${indent} ${prefix} => ${count} Node`)
+		//printStatus(`${indent} ${prefix} => ${count} Node`)
 	}
 	return count
 }
@@ -280,27 +375,27 @@ async function saveManifest(storageSaver: StorageSaver, node: MantarayNode, pref
 
 	if (!counts) {
 		counts = { processed: 0, total: await countManifest(node) }
+		showBoth(`Saving ${counts.total} manifest nodes`)
+		printStatus(`Saving ${counts.total} manifest nodes`)
 	}
 
 	var myCount = 0
-	//let promiseArray = [];
 	if (node.forks) {
 		for (const [key, fork] of Object.entries(node.forks)) {
 			const newPrefix = prefix+utf8ArrayToStr(fork.prefix)
-			
-//	if (node.isValueType()) types = types + "Value ";
-//	if (node.isEdgeType()) types = types + "Edge ";
-//	if (node.isWithPathSeparatorType()) types = types + "Separator ";
-//	if (node.IsWithMetadataType()) types = types + "Meta ";
-			//if (fork.node.isWithPathSeparatorType())
-			//	promiseArray.push(await saveManifest(storageSaver, fork.node, newPrefix, indent+'  ', counts))
-			//else promiseArray.push(saveManifest(storageSaver, fork.node, newPrefix, indent+'  ', counts))
 			const { reference, count } = await saveManifest(storageSaver, fork.node, newPrefix, indent+'  ', counts)
+			//showLog(`save ${newPrefix} => ${bytesToHex(reference)}`)
 			myCount += count
 		}
 	}
 	
-	var ref = await node.save(storageSaver)
+	var ref = hexToBytes(zeroAddress)
+	try {
+		ref = await node.save(storageSaver)
+		showLog(`save ${prefix} => ${bytesToHex(ref)}`)
+	} catch (err) {
+		showBoth(`save ${prefix} ERROR ${err}`)
+	}
 	if (counts) counts.processed++
 	myCount++
 	
@@ -314,7 +409,6 @@ async function saveManifest(storageSaver: StorageSaver, node: MantarayNode, pref
 	if (node.isWithPathSeparatorType()) {
 		showSecondLine(progress)
 		printStatus(`${indent} ${prefix} => ${bytesToHex(ref)} Node`)
-		//showLog(`${indent} ${prefix} => ${bytesToHex(ref)} Node ${progress}`)
 	}
 
 	return { reference: ref, count: myCount }
@@ -331,12 +425,12 @@ async function storeFileAsPath(fullPath : string, posixPath : string, rootNode :
 	const stats = await FS.stat(fullPath)
 	const modified = stats.mtime
 	let lastModified = modified.toUTCString()
-	let metaData = { "Content-Type": mimeType, "Filename": PATH.basename(fullPath), "Last-Modified": lastModified }
+	let metaData = { "Content-Type": mimeType, "Filename": PATH.basename(fullPath) }
+	//Object.assign(metaData, { "Last-Modified": lastModified })
 
 	if (coverageCallback) {
 		if (posixPath.slice(-4).toLowerCase() == '.png') {
 			showError(`Need To Parse ${posixPath} for coverageCallback`)
-			//coverageCallback(posixPath)
 		}
 	}
 	
@@ -344,16 +438,6 @@ async function storeFileAsPath(fullPath : string, posixPath : string, rootNode :
 	const reference = await uploadData(content, posixPath, true)
 
 	const entry = bytesToHex(reference)
-	//await saveTile(undefined, fullPath, modified, entry)
-
-	//if (entries.has(entry)) {
-	//	var usage = (entries.get(entry)!)+1
-	//	entries.set(entry,usage);
-	//}
-	//else {
-	//	entries.set(entry,1);
-	//}
-	
 	if (rootNode) {
 		//showBoth(`adding rootNode Fork for ${fullPath}->${posixPath} reference ${bytesToHex(reference)}`)
 		rootNode.addFork(new TextEncoder().encode(posixPath), reference, metaData)
@@ -368,19 +452,6 @@ async function storeFile(fullPath : string, rootNode : MantarayNode|undefined, r
 	
 	const stats = await FS.stat(fullPath)
 	const modified = stats.mtime
-	//const prevModified = await getMetaModified(fullPath)
-	//if (prevModified && prevModified.getTime() === modified.getTime()) {
-	//	printStatus(`Skipping ${fullPath} ${modified}, already stored!`)
-	//	if (rootNode) {
-	//		const mimeType = contentType(fullPath)
-	//		const lastModified = modified.toUTCString()
-	//		const metaData = { "Content-Type": mimeType, "Filename": PATH.basename(fullPath), "Last-Modified": lastModified }
-	//		const reference = await getMetaReference(fullPath)
-	//		//showBoth(`adding rootNode Fork for ${fullPath}->${posixPath} DB reference ${bytesToHex(reference)}`)
-	//		if (reference) rootNode.addFork(new TextEncoder().encode(posixPath), hexToBytes(reference), metaData)
-	//	}
-	//	return	// No need to process this one!
-	//}
 	
 	return storeFileAsPath(fullPath, posixPath, rootNode, coverageCallback)
 }
@@ -405,24 +476,38 @@ async function addFile(node: MantarayNode, sourcePath: string, filePath: string)
 	
 	const content = await FS.readFile(filePath)
 	let metaData = { "Content-Type": mimeType, "Filename": PATH.basename(relPath) }
-
-	//let lastModified = ''
-	//if (file.modified > 0) {
-	//	lastModified = new Date(utcModified*1000).toUTCString()
-		Object.assign(metaData, { "Last-Modified": modifiedUTC })
-	//}
-	showLog(`adding ${posixPath} type:${mimeType} modified:${modifiedUTC}`);
+	//Object.assign(metaData, { "Last-Modified": modifiedUTC })
+	//showLog(`adding ${posixPath} type:${mimeType} modified:${modifiedUTC}`);
 
 	const reference = await uploadData(content, relPath, true)
 	node.addFork(new TextEncoder().encode(posixPath), reference, metaData)
+	//
+	// The following bit of code puts exceptions back on the path where they originally were.
+	// zimdump does this if a given path is both a directory AND an explicit file
+	if (posixPath.slice(0,12) == '_exceptions/') {
+		var newPath = posixPath.slice(12).replace(/%2f/g, "/")
+		var mimeType2 = contentType(newPath)
+		if (mimeType2 == 'application/octet-stream') {
+			if (newPath.slice(0,2) == 'A/')
+				mimeType2 = 'text/html'
+			else if (newPath.slice(0,2) == 'M/')
+				mimeType2 = 'text/plain'
+		}
+		let metaData2 = { "Content-Type": mimeType2, "Filename": PATH.basename(newPath) }
+		showLog(`Adding ${relPath} also as ${newPath} ${JSON.stringify(metaData2)}`)
+		//Object.assign(metaData2, { "Last-Modified": modifiedUTC })
+		node.addFork(new TextEncoder().encode(newPath), reference, metaData2)	// Insert another node for where the exception SHOULD have been
+	}
 }
-
 
 async function newManifest(storageSaver: StorageSaver, sourcePath: string, index: string|undefined = undefined) : Promise<string> {
 	
 	const startTag = await bee.createTag()
 	tagID = startTag.uid
 
+	runMonitor = true
+	const monTag = monitorTag(tagID)
+	
 	showBoth(`Creating manifest from ${sourcePath} using tag ${tagID} at ${startTag.startedAt}`)
 
 	//const node = initManifestNode()	// Only if you want a random obfuscation key
@@ -447,10 +532,37 @@ async function newManifest(storageSaver: StorageSaver, sourcePath: string, index
 		rootNode.setType = type
 	}
 	
+	showBoth(`Counting files`)
+	printStatus(`Counting files`)
+	var fileCount = 0
 	await (async () => {
 	  for await (const f of getFiles(sourcePath)) {
-	    printStatus(`queueing ${f}`)
-	    showLog(`queueing ${f}`)
+		fileCount++
+		const heap = process.memoryUsage()
+		progress = `rss:${Math.floor(heap.rss/1024/1024)}MB heap:${Math.floor(heap.heapUsed/1024/1024)}/${Math.floor(heap.heapTotal/1024/1024)}MB`
+		progress = `Count ${fileCount} ${sourcePath} ${progress}`
+	  }
+	})()
+
+	showBoth(`Adding ${fileCount} files`)
+	printStatus(`Adding ${fileCount} files`)
+	var didCount = 0
+	await (async () => {
+	  for await (const f of getFiles(sourcePath)) {
+		  
+		const relPath = relative(sourcePath,f)
+		const posixPath = relPath.split(PATH.sep).join(PATH.posix.sep)
+		  
+		didCount++
+	    printStatus(`queueing ${didCount}/${fileCount} ${posixPath}`)
+
+		const heap = process.memoryUsage()
+		progress = `rss:${Math.floor(heap.rss/1024/1024)}MB heap:${Math.floor(heap.heapUsed/1024/1024)}/${Math.floor(heap.heapTotal/1024/1024)}MB`
+		if (fileCount > 0) {
+			const didPercent = Math.floor(didCount / fileCount * 10000)/100
+			progress = `Add ${posixPath} ${didPercent}% or ${didCount}/${fileCount} ${progress}`
+		}
+
 		await addFile(node, sourcePath, f)
 	  }
 	})()
@@ -462,11 +574,7 @@ async function newManifest(storageSaver: StorageSaver, sourcePath: string, index
 	showBoth(`Saving manifest`)
 	printStatus(`Saving manifest`);
 
-	runMonitor = true
-	const monTag = monitorTag(tagID)
-	
 	var start = new Date().getTime()
-	//var refCollection = await node.save(storageSaver)
 	var refCollection = (await saveManifest(storageSaver, node)).reference
 	var elapsed = Math.trunc((new Date().getTime() - start)/1000+0.5)
 	
@@ -497,7 +605,6 @@ async function printAllForks(storageLoader: StorageLoader, node: MantarayNode, r
 	if (exitRequested) return
 	
 	try {
-		//await isRetrievable(bytesToHex(reference), `node(${prefix})`)
 		await node.load(storageLoader, reference)
 	}
 	catch (err) {
@@ -517,7 +624,7 @@ async function printAllForks(storageLoader: StorageLoader, node: MantarayNode, r
 	if (address) addrString = bytesToHex(address);
 	//showLog(`${indent}type:x${Number(node.getType).toString(16)} ${types} prefix:${prefix} content:${addrString}`)
 
-	printStatus(`${indent}type:x${Number(node.getType).toString(16)} ${types} prefix:${prefix} content:${addrString}`);
+	showLog(`${indent}type:x${Number(node.getType).toString(16)} ${types} prefix:${prefix} content:${addrString}`);
 
 	//var reference = bytesToHex(node.getReference)
 	//if (reference != zeroAddress)
@@ -529,12 +636,15 @@ async function printAllForks(storageLoader: StorageLoader, node: MantarayNode, r
 
 	var entry = bytesToHex(node.getEntry)
 	if (entry != zeroAddress) {
-		//showLog(`${indent}entry:${entry}`)
-		printStatus(`${indent}type:x${Number(node.getType).toString(16)} ${types} prefix:${prefix} entry:${entry}`);
-		
-		//if (loadFiles && what && what != "") {
-		//	pendingFiles.push({prefix: prefix, reference: entry});
-		//}
+		showLog(`${indent}type:x${Number(node.getType).toString(16)} ${types} prefix:${prefix} entry:${entry}`);
+		if (loadFiles && what && what != "") {
+			try {
+				const content = await downloadData(entry, prefix)
+				showLog(`${indent}${prefix} got ${content.length} bytes`)
+			} catch (err) {
+				showLog(`printAllForks:downloadData(${prefix}) err ${err}`)
+			}
+		}
 	}
 
 	if (node.IsWithMetadataType() && node.getMetadata) {
@@ -548,7 +658,6 @@ async function printAllForks(storageLoader: StorageLoader, node: MantarayNode, r
 	if (exitRequested) return
 
 	if (!node.forks) return
-	//const promiseArray = [];
 	for (const [key, fork] of Object.entries(node.forks)) {
 		var newPrefix = prefix+utf8ArrayToStr(fork.prefix)
 		if (filter && filter != '') {
@@ -578,19 +687,8 @@ async function printAllForks(storageLoader: StorageLoader, node: MantarayNode, r
 			}
 			if (found) continue
 		}
-		//showLog(`${indent}Fork[${key}] prefix ${newPrefix} ${bytesToHex(fork.node.getEntry)}`)
-		//if (fork.node.isValueType() && !fork.node.isEdgeType()) {	// Handle value (non-edge) nodes first to resolve files quicker
-		//	if (!manifestOnly) {
-		//		pendingValues.push({node: fork.node, prefix: newPrefix, indent: indent+'  ', excludes: excludes})	// Enough pendingFiles backlog, queue to the end
-		//	//} else {
-		//	//	//showLog(`${indent}Fork[${key}] Skipping ValueType prefix ${newPrefix} ${bytesToHex(fork.node.getEntry)}`)
-		//	//	checkFiles++
-		//	}
-		//}
-		//else pendingNodes.push({node: fork.node, prefix: newPrefix, indent: indent+'  ', excludes: excludes});
 		await printAllForks(storageLoader, fork.node, fork.node.getEntry, newPrefix, indent+'  ', what, filter, excludes, manifestOnly, loadFiles, saveFiles)
 	}
-	//await Promise.all(promiseArray)
 }
 
 
@@ -609,111 +707,120 @@ async function dumpManifest(storageLoader: StorageLoader, reference: string, wha
 }
 
 async function uploadData(content: Uint8Array | string, what: string, pin: boolean) : Promise<Reference> {
-	//const [value, release] = await semaphorePutContent.acquire();
-	showBoth(`uploadData ${what} ${content.length} bytes`)
+	const retryDelay = 15	// 15 second delay before doing a retry
+	const timeout = 10000	// 10 second timeout per request, note this is *4 for retries
+	var reference: string
 	var start = new Date().getTime()
 	try {
-		var reference = await bee.uploadData(batchID, content, {pin: pin, tag: tagID})
+		//reference = (await bee.uploadData(batchID, content, {pin: pin, tag: tagID, timeout: timeout, fetch: fetch})).reference
+		reference = (await executeAPI(beeUrl, 'bytes', '', 'POST', {"Content-Type": "application/octet-stream", "swarm-postage-batch-id": batchID, "swarm-tag": `${tagID}`, "swarm-pin": `${pin}`}, content)).reference
+		if (uploadDelay > 0) await sleep(uploadDelay)
 	}
 	catch (err) {
 		showBoth(`uploadData ${what} ${content.length} bytes failed with ${err}`)
-		await sleep(15000)
+		await statusDelay(retryDelay)
+		printStatus(`uploadData RETRYING ${what} ${content.length} bytes after ${err}`)
 		try {
-			var reference = await bee.uploadData(batchID, content, {pin: pin, tag: tagID})
+			//reference = (await bee.uploadData(batchID, content, {pin: pin, tag: tagID, timeout: timeout*4, fetch: fetch})).reference	// Quadruple the timeout for the retry
+			reference = (await executeAPI(beeUrl, 'bytes', '', 'POST', {"Content-Type": "application/octet-stream", "swarm-postage-batch-id": batchID, "swarm-tag": `${tagID}`, "swarm-pin": `${pin}`}, content)).reference
 		}
 		catch (err) {
 			showBoth(`uploadData ${what} RETRY ${content.length} bytes failed with ${err}`)
 			throw err
 		}
 	}
-	finally {
-		//release();
-	}
 	var elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
-	if (elapsed >= 2)
+	if (elapsed >= timeout/4/1000)	// Alert the user if we are >25% of timeout value
 		showError(`uploadData ${what} ${content.length} bytes took ${elapsed}s, ref:${reference}`)
+	showLog(`Upload ${what} ${content.length} bytes => ${reference}`)
 	return hexToBytes(reference)
 }
 
 const saveFunction = async (data: Uint8Array): Promise<Reference> => {
-	//const [value, release] = await semaphoreManifestSaves.acquire();
-	try {
-		const hexRef = await bee.uploadData(batchID, data, {pin: true, tag: tagID})
-		return hexToBytes(hexRef)
-	}
-	catch (err) {
-		showBoth(`saveFunction ${data.length} bytes failed with ${err}`)
-		await sleep(15000)
-		try {
-			const hexRef = await bee.uploadData(batchID, data, {pin: true, tag: tagID})
-			return hexToBytes(hexRef)
-		}
-		catch (err) {
-			showBoth(`saveFunction RETRY ${data.length} bytes failed with ${err}`)
-			throw err
-		}
-	}
-	finally {
-		//release();
-	}
+	return uploadData(data, `saveFunction(${data.length})`, true)
+//	try {
+//		const hexRef = await bee.uploadData(batchID, data, {pin: true, tag: tagID})
+//		if (uploadDelay > 0) await sleep(uploadDelay)
+//		return hexToBytes(hexRef)
+//	}
+//	catch (err) {
+//		showBoth(`saveFunction ${data.length} bytes failed with ${err}`)
+//		await statusDelay(15)
+//		try {
+//			const hexRef = await bee.uploadData(batchID, data, {pin: true, tag: tagID})
+//			return hexToBytes(hexRef)
+//		}
+//		catch (err) {
+//			showBoth(`saveFunction RETRY ${data.length} bytes failed with ${err}`)
+//			throw err
+//		}
+//	}
 }
 
-const loadFunction = async (address: Reference): Promise<Uint8Array> => {
-	//showError(`Loading ${loadsActive}/${maxLoadsActive} @ ${Utils.Hex.bytesToHex(address)}`)
-	//const [value, release] = await semaphoreManifestLoads.acquire();
+async function downloadData(address: string, what : string = "*unknown*") : Promise<Uint8Array> {
 	var start = new Date().getTime()
 	var bytes = 0
-	var r
+	var content
 	try {
-		r = await bee.downloadData(bytesToHex(address))
-		bytes = r.length
+		//content = await bee.downloadData(address)
+		content = await executeBinaryAPI(beeUrl, 'bytes', address)
+		bytes = content.length
 		if (bytes == 0) throw new Error('Zero Bytes Read');
+		//var content = await executeAPI(beeUrl, 'bytes', 'get', address)
 	}
 	catch (err) {
 		const elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
-		showBoth(`loadFunction ${bytesToHex(address)} failed in ${elapsed}s with ${err}`)
+		showBoth(`downloadData ${what} ${address} failed in ${elapsed}s with ${err}`)
 		throw err
 	}
-	finally {
-		//release();
-	}
-	var elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
-	if (elapsed >= 1)
-		showError(`loadFunction(${Utils.Hex.bytesToHex(address)}) took ${elapsed}s`)
-	//showError(`done loadActive:${loadsActive}/${maxLoadsActive}`)
-	return r;
+	const elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
+	if (elapsed >= 5)
+		showError(`downloadData(${what} ${address}) took ${elapsed}s for ${bytes} bytes`)
+	return content
 }
 
-async function doit() {
+const loadFunction = async (address: Reference): Promise<Uint8Array> => {
+	return downloadData(bytesToHex(address), "loadFunction")
+//	var start = new Date().getTime()
+//	var bytes = 0
+//	var r
+//	try {
+//		r = await bee.downloadData(bytesToHex(address))
+//		bytes = r.length
+//		if (bytes == 0) throw new Error('Zero Bytes Read');
+//	}
+//	catch (err) {
+//		const elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
+//		showBoth(`loadFunction ${bytesToHex(address)} failed in ${elapsed}s with ${err}`)
+//		throw err
+//	}
+//	var elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
+//	if (elapsed >= 1)
+//		showError(`loadFunction(${bytesToHex(address)}) took ${elapsed}s`)
+//	return r;
+}
 
-	const addresses = await executeAPI(beeDebugUrl, "addresses")
+async function doit(srcDir: string) {
 
-	console.log(`overlay: ${addresses.overlay}`)
-	console.log(`ethereum: ${addresses.ethereum}`)
-	console.log(`${addresses.underlay.length} underlay addresses:`)
-
-	for (var i=0; i<addresses.underlay.length; i++)
-	{
-		console.log(`    ${i}: ${addresses.underlay[i]}`)
-	}
-
-	const srcDir = "C:/swarm-bee/try-local/z1-8/OSM-Zoom-0-8"
-	const rootNode = await newManifest(saveFunction, srcDir, "index.html")
-	showBoth(`Uploaded ${srcDir} as ${rootNode}`)
+//	For uploading a straight directory set with an index.html
+//	const rootNode = await newManifest(saveFunction, srcDir, "index.html")
+//	showBoth(`Uploaded ${srcDir} as ${rootNode}`)
 	
-//	await dumpManifest(loadFunction, rootNode, srcDir, undefined, undefined, false, false, false)
-
-//	const srcDir = "r:/virtual machines/shared/wikipedia/bounty"
+//	For uploading a Wikipedia archive with A/index
 //	const rootNode = await newManifest(saveFunction, srcDir, "A/index")
 //	showBoth(`Uploaded ${srcDir} as ${rootNode}`)
 	
-//	await dumpManifest(loadFunction, rootNode, srcDir, undefined, undefined, false, false, false)
+	const rootNode = "9aafea948007399891290fc3b294fdfbbf7f51313111dd20ba2bb6ff2a1ecd27"
 
-	//const rootNode = await dumpManifest(loadFunction, '271b0c6b262a321be0e81748a43bf3dbc151ed2af45c1eae2906880eedc0b626', 'test18', undefined, undefined, false, false, false)	// Zoom 18 on testnet
+//	This will dump out the uploaded manifest
+	await dumpManifest(loadFunction, rootNode, srcDir, undefined, undefined, false, true, false)
 
-	//const rootNode = await dumpManifest(loadFunction, 'e7104c27245a63445db6c58568f29e65fb28aa3f3ad80b1f9079e4cfef6cd9b6', 'bounty', undefined, undefined, false, false, false)	// Wikipedia bounty ZIM contents
-
-	// const rootNode = await dumpManifest(loadFunction, '1c3d4b7466b70cc2a4bdfe9dba14c5cd88b56b731b51daf442a9958ac40dd290', 'bounty', undefined, undefined, false, false, false)	// Wikipedia bounty ZIM contents
+	showBoth(`View your archive at ${beeUrl}/bzz/${rootNode}`)
 }
 
-doit()
+try {
+	doit(process.argv[2])
+} catch (err) {
+	showBoth(`${err}`)
+
+}

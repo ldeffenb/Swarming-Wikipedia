@@ -18,4 +18,10 @@ COPY . .
 
 RUN npm run build
 
-CMD [ "node", "dist/index.js" ]
+RUN wget https://download.openzim.org/release/zim-tools/zim-tools_linux-x86_64-3.1.0.tar.gz
+RUN tar xzvf zim-tools_linux-x86_64-3.1.0.tar.gz
+RUN rm zim-tools_linux-x86_64-3.1.0.tar.gz
+
+ENTRYPOINT ["sh","get-and-swarm-archive.sh"]
+
+#CMD ["https://download.kiwix.org/zim/wikipedia/wikipedia_bm_all_maxi_2022-02.zim" "http://192.168.10.172:1633" "c749612363aa9f0345041e24b54e6d177285148ac78356a6b33e468d6b418995"]

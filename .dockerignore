@@ -1,2 +1,10 @@
+*.zim
+archive
+smallArchive
+wikipedia_en_100_maxi_2022-03.zim
+
+.git
+dist
 node_modules
 npm-debug.log
+zim-tools_linux-x86_64-3.1.0
