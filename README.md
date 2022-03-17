@@ -1,7 +1,8 @@
 # Swarming-Wikipedia
 A TypeScript-based tool to upload a Wikipedia snapshot to the swarm, limited only by the size of your stamp, not the size of the snapshot.  This 
-tool was written for the [We Are Millions](https://www.wearemillions.online/) [Fair Data Society](https://fairdatasociety.org/) Hackathon
-bounty at [github](https://github.com/fairdatasociety/wam/issues/18) and [gitcoin](https://gitcoin.co/issue/fairdatasociety/wam/18/100027844).
+tool was written for the [We Are Millions](https://www.wearemillions.online/) ([Fair Data Society](https://fairdatasociety.org/)) Hackathon bounty 
+"Best upload of Wikipedia mirror to Swarm" ([github](https://github.com/fairdatasociety/wam/issues/18) and [gitcoin](https://gitcoin.co/issue/fairdatasociety/wam/18/100027844)) 
+in partnership with [Kiwix](https://www.kiwix.org/).
 
 ## DISCLAIMER
 This software is provided to you "as is", use at your own risk and without warranties of any kind.
