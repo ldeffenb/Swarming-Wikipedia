@@ -1,8 +1,5 @@
 # Swarming-Wikipedia
-A TypeScript-based tool to upload a Wikipedia snapshot to the swarm, limited only by the size of your stamp, not the size of the snapshot.  This tool was written for the WeAreMillions Hackathon.
-
-`https://github.com/fairdatasociety/wam/issues/18`
-`https://gitcoin.co/issue/fairdatasociety/wam/18/100027844`
+A TypeScript-based tool to upload a Wikipedia snapshot to the swarm, limited only by the size of your stamp, not the size of the snapshot.  This tool was written for the [We Are Millions](https://www.wearemillions.online/) [Fair Data Society](https://fairdatasociety.org/) Hackathon at [github](https://github.com/fairdatasociety/wam/issues/18) and [gitcoin](https://gitcoin.co/issue/fairdatasociety/wam/18/100027844).
 
 ## DISCLAIMER
 This software is provided to you "as is", use at your own risk and without warranties of any kind.
@@ -32,7 +29,7 @@ where:
 
 You can select any Wikipedia Archive from the [kiwix.org master list](https://download.kiwix.org/zim/wikipedia/).  The following URL is the required one to use for the We Are Millions bounty.
 
-`https://download.kiwix.org/zim/wikipedia/wikipedia_bm_all_maxi_2022-02.zim`
+[wikipedia_bm_all_maxi_2022-02.zim](https://download.kiwix.org/zim/wikipedia/wikipedia_bm_all_maxi_2022-02.zim)
 
 If you are running a bee node on IP address `192.168.10.8`, then `beeNodeURL` could be `http://192.168.10.8:1633`.  Remember, this URL must be accessible to a process running inside the Docker container, so it is likely that neither `http://127.0.0.1:1633` nor `http://localhost:1633` will work.
 
