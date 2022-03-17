@@ -1,5 +1,8 @@
 # Swarming-Wikipedia
-A TypeScript-based tool to upload a Wikipedia snapshot to the swarm, limited only by the size of your stamp, not the size of the snapshot.
+A TypeScript-based tool to upload a Wikipedia snapshot to the swarm, limited only by the size of your stamp, not the size of the snapshot.  This tool was written for the WeAreMillions Hackathon.
+
+`https://github.com/fairdatasociety/wam/issues/18`
+`https://gitcoin.co/issue/fairdatasociety/wam/18/100027844`
 
 ## DISCLAIMER
 This software is provided to you "as is", use at your own risk and without warranties of any kind.
@@ -33,7 +36,7 @@ You can select any Wikipedia Archive from the [kiwix.org master list](https://do
 
 If you are running a bee node on IP address `192.168.10.8`, then `beeNodeURL` could be `http://192.168.10.8:1633`.  Remember, this URL must be accessible to a process running inside the Docker container, so it is likely that neither `http://127.0.0.1:1633` nor `http://localhost:1633` will work.
 
-You can verify a `stampBatch` usability with something like (assuming your bee node is running on `192.168.10.8` and has the default Debug API address enabled):
+You can verify a `stampBatch` usability with something like the following command (assuming your bee node is running on `192.168.10.8` and has the default Debug API address enabled).  For information on purchasing stamps, see [here](https://docs.ethswarm.org/docs/access-the-swarm/keep-your-data-alive).
 
 `curl http://192.168.10.8:1635/stamps | jq`
 
@@ -41,7 +44,9 @@ The Swarming-Wikipedia tool will provide some status feedback as it executes.  T
 
 `View your archive at http://192.168.10.8:1633/bzz/9aafea948007399891290fc3b294fdfbbf7f51313111dd20ba2bb6ff2a1ecd27`
 
-Note that due to propagation variations in the swarm, a freshly uploaded archive may not be immediately accessible from other nodes in the swarm.  If you encounter errors accessing the archive, wait a while to give the upload time to propagate.
+Note that due to propagation variations in the swarm, a freshly uploaded archive may not be immediately accessible from other nodes in the swarm.  If you encounter errors accessing the archive, wait a while to give the upload time to propagate.  Or you can poll the tag information using something like the following command which is also displayed when the tool has finished the upload.
+
+`curl http://192.168.10.8:1633/tags/2577402878 | jq`
 
 ## Technical Description
 
