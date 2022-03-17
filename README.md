@@ -1,5 +1,7 @@
 # Swarming-Wikipedia
-A TypeScript-based tool to upload a Wikipedia snapshot to the swarm, limited only by the size of your stamp, not the size of the snapshot.  This tool was written for the [We Are Millions](https://www.wearemillions.online/) [Fair Data Society](https://fairdatasociety.org/) Hackathon at [github](https://github.com/fairdatasociety/wam/issues/18) and [gitcoin](https://gitcoin.co/issue/fairdatasociety/wam/18/100027844).
+A TypeScript-based tool to upload a Wikipedia snapshot to the swarm, limited only by the size of your stamp, not the size of the snapshot.  
+This tool was written for the [We Are Millions](https://www.wearemillions.online/) [Fair Data Society](https://fairdatasociety.org/) Hackathon
+bounty at [github](https://github.com/fairdatasociety/wam/issues/18) and [gitcoin](https://gitcoin.co/issue/fairdatasociety/wam/18/100027844).
 
 ## DISCLAIMER
 This software is provided to you "as is", use at your own risk and without warranties of any kind.
@@ -27,21 +29,30 @@ where:
 - `beeNodeURL` is the URL for a suitable bee node's API port
 - `usableStampBatch` is the stamp batch to pay for the upload
 
-You can select any Wikipedia Archive from the [kiwix.org master list](https://download.kiwix.org/zim/wikipedia/).  The following URL is the required one to use for the We Are Millions bounty.
+You can select any Wikipedia Archive from the [kiwix.org master list](https://download.kiwix.org/zim/wikipedia/).  The following URL 
+is the required one to use for the We Are Millions bounty.
 
 [wikipedia_bm_all_maxi_2022-02.zim](https://download.kiwix.org/zim/wikipedia/wikipedia_bm_all_maxi_2022-02.zim)
 
-If you are running a bee node on IP address `192.168.10.8`, then `beeNodeURL` could be `http://192.168.10.8:1633`.  Remember, this URL must be accessible to a process running inside the Docker container, so it is likely that neither `http://127.0.0.1:1633` nor `http://localhost:1633` will work.
+If you are running a bee node on IP address `192.168.10.8`, then `beeNodeURL` could be `http://192.168.10.8:1633`.  Remember, this URL 
+must be accessible to a process running inside the Docker container, so it is likely that neither `http://127.0.0.1:1633` nor 
+`http://localhost:1633` will work.
 
-You can verify a `stampBatch` usability with something like the following command (assuming your bee node is running on `192.168.10.8` and has the default Debug API address enabled).  For information on purchasing stamps, see [here](https://docs.ethswarm.org/docs/access-the-swarm/keep-your-data-alive).
+You can verify a `stampBatch` usability with something like the following command (assuming your bee node is running on `192.168.10.8` 
+and has the default Debug API address enabled).  For information on purchasing stamps, see 
+[here](https://docs.ethswarm.org/docs/access-the-swarm/keep-your-data-alive).
 
 `curl http://192.168.10.8:1635/stamps | jq`
 
-The Swarming-Wikipedia tool will provide some status feedback as it executes.  The time required will depend mostly on the size of the .ZIM file being pushed to the swarm.  When the tool has finished, a final log line similar to the following will be shown.  The URL in this log can be used to access the uploaded archive from the node through which it was uploaded.
+The Swarming-Wikipedia tool will provide some status feedback as it executes.  The time required will depend mostly on the size 
+of the .ZIM file being pushed to the swarm.  When the tool has finished, a final log line similar to the following will be shown.  
+The URL in this log can be used to access the uploaded archive from the node through which it was uploaded.
 
 `View your archive at http://192.168.10.8:1633/bzz/9aafea948007399891290fc3b294fdfbbf7f51313111dd20ba2bb6ff2a1ecd27`
 
-Note that due to propagation variations in the swarm, a freshly uploaded archive may not be immediately accessible from other nodes in the swarm.  If you encounter errors accessing the archive, wait a while to give the upload time to propagate.  Or you can poll the tag information using something like the following command which is also displayed when the tool has finished the upload.
+Note that due to propagation variations in the swarm, a freshly uploaded archive may not be immediately accessible from other 
+nodes in the swarm.  If you encounter errors accessing the archive, wait a while to give the upload time to propagate.  Or you 
+can poll the tag information using something like the following command which is also displayed when the tool has finished the upload.
 
 `curl http://192.168.10.8:1633/tags/2577402878 | jq`
 
@@ -93,3 +104,4 @@ https://wiki.openzim.org/wiki/OpenZIM
 - Extremely large collections may result in large memory consumption as the manifest is constructed in RAM before being saved to the swarm.  It is possible, although non-trivial, to construct and save partial manifests and combine them later without holding them concurrently in RAM.
 - Upload performance can be increased by paralleling requests.  However, this comes with an increased risk of exceeding the time settlements and actually needing to issue cheques to pay for push data transfers.
 - The /bytes API defaults to deferred uploads.  If a non-deferred upload is selected, then the tool would not complete until the required chunks have been initially distributed to the swarm.
+- The tool is very non-modular (read: a single source file).  It could be modularized for readability and re-use.
