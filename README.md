@@ -45,8 +45,8 @@ and has the default Debug API address enabled).  For information on purchasing s
 `curl http://192.168.10.8:1635/stamps | jq`
 
 The Swarming-Wikipedia tool will provide some status feedback as it executes.  The time required will depend mostly on the size 
-of the .ZIM file being pushed to the swarm.  When the tool has finished, a final log line similar to the following will be shown.  
-The URL in this log can be used to access the uploaded archive from the node through which it was uploaded.
+of the .ZIM file being pushed to the swarm.  When the tool has finished, a final log line similar to the following will be shown.  The 
+URL in this log can be used to access the uploaded archive from the node through which it was uploaded.
 
 `View your archive at http://192.168.10.8:1633/bzz/9aafea948007399891290fc3b294fdfbbf7f51313111dd20ba2bb6ff2a1ecd27`
 
