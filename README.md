@@ -95,10 +95,10 @@ This tool is distributed under the BSD 3-Clause License found in the [LICENSE](L
 
 The author is indebted to (at least):
 
-https://www.docker.com/blog/getting-started-with-docker-using-node-jspart-i/
-https://stackoverflow.com/questions/40873165/use-docker-run-command-to-pass-arguments-to-cmd-in-dockerfile
-https://stackoverflow.com/questions/4341630/checking-for-the-correct-number-of-arguments
-https://wiki.openzim.org/wiki/OpenZIM
+- https://www.docker.com/blog/getting-started-with-docker-using-node-jspart-i/
+- https://stackoverflow.com/questions/40873165/use-docker-run-command-to-pass-arguments-to-cmd-in-dockerfile
+- https://stackoverflow.com/questions/4341630/checking-for-the-correct-number-of-arguments
+- https://wiki.openzim.org/wiki/OpenZIM
 
 and of course to my long time supporting the development of the [swarm](https://docs.ethswarm.org/docs/)!
 
