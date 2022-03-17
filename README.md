@@ -1,6 +1,6 @@
 # Swarming-Wikipedia
-A TypeScript-based tool to upload a Wikipedia snapshot to the swarm, limited only by the size of your stamp, not the size of the snapshot.  
-This tool was written for the [We Are Millions](https://www.wearemillions.online/) [Fair Data Society](https://fairdatasociety.org/) Hackathon
+A TypeScript-based tool to upload a Wikipedia snapshot to the swarm, limited only by the size of your stamp, not the size of the snapshot.  This 
+tool was written for the [We Are Millions](https://www.wearemillions.online/) [Fair Data Society](https://fairdatasociety.org/) Hackathon
 bounty at [github](https://github.com/fairdatasociety/wam/issues/18) and [gitcoin](https://gitcoin.co/issue/fairdatasociety/wam/18/100027844).
 
 ## DISCLAIMER
@@ -79,7 +79,7 @@ The Swarming-Wikipedia TypeScript does the following
 - [mantaray-js](https://github.com/ethersphere/mantaray-js) is used to allow for larger collections than the typical [tar-based collection uploads](https://docs.ethswarm.org/api/#tag/BZZ/paths/~1bzz/post)
 - [Axios](https://github.com/axios/axios) was used to allow the API connection to the bee node to be kept alive.  Repeated use of the [bee-js](https://github.com/ethersphere/bee-js) uploadData API generates many TIME_WAIT sockets as a new connection is created for each API invocation.
 - Any extension-less file for which Content-Type cannot be determined is assumed to be text/html if it is located in the A subdirectory.
-- A custom index-redirect.html is created in the root of the collection and set as the default file to redirect to A/index which is assumed to be the actual archive entry point.
+- A custom index-redirect.html or master-index.html is created in the root of the collection and set as the default file to both redirect to A/index (assumed to be the actual archive entry point) and present a generated list of linked articles.
 - "Special" characters are handled in the file names to ensure linkability from the generated index as well as to provide a better humanly-readable presentation of the link.  This is more viaible with [wikipedia_en_100_maxi_2022-03.zim](https://download.kiwix.org/zim/wikipedia/wikipedia_en_100_maxi_2022-03.zim).
 - Files that zimdump puts into the _exceptions directory are added as references to their originally specified directory.  This happens when the archive contains a file and a directory that share the same name.  I'm not 100% certain that swarm's manifest handles this properly, but I do it anyway.
 - All uploaded chunks are pinned in the uploading node, so the entire collection should always be visible via the /bzz URL at that node.
@@ -99,7 +99,7 @@ https://stackoverflow.com/questions/40873165/use-docker-run-command-to-pass-argu
 https://stackoverflow.com/questions/4341630/checking-for-the-correct-number-of-arguments
 https://wiki.openzim.org/wiki/OpenZIM
 
-and of course to my long time supporting the development of the swarm!
+and of course to my long time supporting the development of the [swarm](https://docs.ethswarm.org/docs/)!
 
 ## Technical Debt (ToDos)
 
@@ -110,3 +110,4 @@ and of course to my long time supporting the development of the swarm!
 - The tool is very non-modular (read: a single source file).  It could be modularized for readability and re-use.
 - Better styling of the generated index of A/ documents (currently hard-coded at 3 columns)
 - Remove redundancy of mis-speeled (sic) redirect files in the generated index
+- Use of zimlib rather than zimdump might make a few things eaiser to accomplish, but the bounty specified using zimdump.
