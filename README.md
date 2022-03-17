@@ -65,7 +65,7 @@ The Swarming-Wikipedia tool works at a high level by doing the following via get
 2. Use [zimdump](https://github.com/openzim/zim-tools) to extract archive.zim to the archive subdirectory
 3. Activate node.js to execute a compiled TypeScript which does the actual uploading
 
-The Swarming-Wikipedia TypeScript does the following
+The Swarming-Wikipedia TypeScript then does the following
 
 1. Count all files located in the archive subdirectory simultaneously building an index for A/-resident files
 2. Create a tag to track upload and pusher progress.  This tag is visible on the top line as the upload happens.
@@ -81,7 +81,7 @@ The Swarming-Wikipedia TypeScript does the following
 - [Axios](https://github.com/axios/axios) was used to allow the API connection to the bee node to be kept alive.  Repeated use of the [bee-js](https://github.com/ethersphere/bee-js) uploadData API generates many TIME_WAIT sockets as a new connection is created for each API invocation.
 - Any extension-less file for which Content-Type cannot be determined is assumed to be text/html if it is located in the A subdirectory.
 - A custom index-redirect.html or master-index.html is created in the root of the collection and set as the default file to both redirect to A/index (assumed to be the actual archive entry point) and present a generated list of linked articles.
-- "Special" characters are handled in the file names to ensure linkability from the generated index as well as to provide a better humanly-readable presentation of the link.  This is more viaible with [wikipedia_en_100_maxi_2022-03.zim](https://download.kiwix.org/zim/wikipedia/wikipedia_en_100_maxi_2022-03.zim).
+- "Special" characters are handled in the file names to ensure linkability from the generated index as well as to provide a better humanly-readable presentation of the link.  This is more visible with [wikipedia_en_100_maxi_2022-03.zim](https://download.kiwix.org/zim/wikipedia/wikipedia_en_100_maxi_2022-03.zim).
 - Files that zimdump puts into the _exceptions directory are added as references to their originally specified directory.  This happens when the archive contains a file and a directory that share the same name.  I'm not 100% certain that swarm's manifest handles this properly, but I do it anyway.
 - All uploaded chunks are pinned in the uploading node, so the entire collection should always be visible via the /bzz URL at that node.
 - The tool (without zimdump and directly executing the [TS component](src/index.ts)) can also upload any arbitrary directory tree of files to the swarm, with a code-able default entry point which defaults to index.html.

@@ -27,4 +27,6 @@ echo
 echo "node ./archive $2 $3"
 node dist/index.js "./archive" "$2" "$3" >/dev/null
 
+echo
+
 rm -rf ./archive

@@ -18,7 +18,7 @@ COPY . .
 
 RUN npm run build
 
-RUN wget https://download.openzim.org/release/zim-tools/zim-tools_linux-x86_64-3.1.0.tar.gz
+RUN wget -q https://download.openzim.org/release/zim-tools/zim-tools_linux-x86_64-3.1.0.tar.gz
 RUN tar xzvf zim-tools_linux-x86_64-3.1.0.tar.gz
 RUN rm zim-tools_linux-x86_64-3.1.0.tar.gz
 
