@@ -26,7 +26,7 @@ The Swarming-Wikipedia tool is designed to be built into and executed from a Doc
 
 where:
 
-- `WikidpediaArchiveURL` is the URL for a Wikipedia Archive .ZIM file to push to the swarm
+- `WikipediaArchiveURL` is the URL for a Wikipedia Archive .ZIM file to push to the swarm
 - `beeNodeURL` is the URL for a suitable bee node's API port
 - `usableStampBatch` is the stamp batch to pay for the upload
 
