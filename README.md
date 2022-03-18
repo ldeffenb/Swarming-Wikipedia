@@ -112,4 +112,4 @@ and of course to my long time supporting the development of the [swarm](https://
 - The tool is very non-modular (read: a single source file).  It could be modularized for readability and re-use.
 - Better styling of the generated index of A/ documents (currently hard-coded at 3 columns)
 - Remove redundancy of mis-speeled (sic) redirect files in the generated index
-- Use of zimlib rather than zimdump might make a few things eaiser to accomplish, but the bounty specified using zimdump.
+- Use of zimlib rather than zimdump might make a few things easier to accomplish, but the bounty specified using zimdump.
