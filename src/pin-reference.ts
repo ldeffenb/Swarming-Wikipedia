@@ -312,9 +312,66 @@ function showFailures() {
 }
 
 const RetrievableMax = 200
+const LookaheadFactor = 10
 const semaphorePin = new Semaphore(1);
 const semaphoreGetContent = new Semaphore(20);
 const semaphorePutContent = new Semaphore(20);
+
+var checkNodes = 0
+var checkFiles = 0
+var pinnedFiles = 0
+var totalFiles = 0
+var nodeFails = 0
+var node2Fails = 0
+var fileFails = 0
+var file2Fails = 0
+var pendNodes = 0
+var doneNodes = 0
+var pendFiles = 0
+var doneFiles = 0
+var createdPins = 0
+var existingPins = 0
+var failedPins = 0
+var reuploadFailures = 0
+
+var uploadRefresher : any
+var stopUploadRefresher = false
+
+async function reuploadRefresher() {
+	while (!stopUploadRefresher) {
+		await sleep(1000)
+		refreshReupload()
+	}
+}
+
+function refreshReupload(total?:number) {
+	if (total && total > 0) {
+		totalFiles = total
+		checkNodes = 0
+		checkFiles = 0
+		pendNodes = 0
+		doneNodes = 0
+		pendFiles = 0
+		doneFiles = 0
+		reuploadFailures = 0
+	}
+	if (true || checkNodes > 0 || checkFiles > 0 || totalFiles > 0) {
+		const heap = process.memoryUsage()
+		const text = `Check:${checkNodes}+${checkFiles}-${pinnedFiles}/${totalFiles} Fails:${nodeFails}+${fileFails} Fatal:${node2Fails}+${file2Fails} Pins:exist:${existingPins} cre:${createdPins} fail:${failedPins} Pending:Nodes:${pendingNodes.length}(${nodesRunning}-${nodesSleeping})+${pendingValues.length}(${valuesRunning}-${valuesSleeping}) Files:${pendingFiles.length}(${filesRunning}-${filesSleeping}) rss:${Math.floor(heap.rss/1024/1024)}MB`
+		showTopLine(text)
+		if (total) showBoth(text)
+		if (!uploadRefresher) {
+			if (!total) showBoth('refreshReupload:Starting reuploadRefresher')
+			uploadRefresher = reuploadRefresher()
+		}
+	}
+}
+
+
+
+
+
+
 
 
 
@@ -324,6 +381,7 @@ async function getPin(reference: string) : Promise<boolean> {
 		const pin = await executeAPI(beeUrl, 'pins', `${reference}`, 'get', {}, '', true)	// 404 error expected on this
 		if (pin) {
 			//showBoth(`Existing pin for ${reference}`)
+			existingPins++
 			return true
 		}
 	} catch (err) {
@@ -351,8 +409,10 @@ async function pinReference(reference: string, type: string, path: string) : Pro
 		printStatus(`Actually pinning ${type} ${path} at ${reference}`)
 		const result = createPin(reference)
 		if (await result) {
+			createdPins++
 			showLog(`Successfully pinned ${type} ${path} at ${reference}`)
 		} else {
+			failedPins++
 			showBoth(`Failed to pin ${type} ${path} at ${reference}`)
 		}
 		return result
@@ -385,38 +445,73 @@ let pendingNodes: Array<pendingNode> = [];
 let nodesRunning = 0;
 let valuesRunning = 0;
 let filesRunning = 0;
+let nodesSleeping = 0;
+let valuesSleeping = 0;
+let filesSleeping = 0;
 let nodesActive = 0;
-
-
-
 
 const queueing = true
 
-
-
 async function checkFile(entry: string, prefix: string, indent: string) {
-	try {
-		const content = await downloadData(entry, prefix)
-		showLog(`${indent}${prefix} got ${content.length} bytes`)
-		await pinReference(entry, 'file', prefix)
-	} catch (err: any) {
-		showLog(`checkFile:downloadData(${prefix}) err ${err}`)
-		addFailure('file', prefix, entry, err.toString())
+	if (!await getPin(entry)) {
+		try {
+			checkFiles++
+			const content = await downloadData(entry, prefix)
+			showLog(`${indent}${prefix} got ${content.length} bytes`)
+			await pinReference(entry, 'file', prefix)
+		} catch (err: any) {
+			fileFails++
+			showLog(`checkFile:downloadData(${prefix}) err ${err}`)
+			addFailure('file', prefix, entry, err.toString())
+			await sleep(1000)
+			try {
+				const content2 = await downloadData(entry, prefix)
+				addFailure('file', prefix, entry, `Recovered(${err.toString()})`)
+				showLog(`${indent}${prefix} got RETRY ${content2.length} bytes after ${err}`)
+				await pinReference(entry, 'file', prefix)
+			} catch (err2: any) {
+				file2Fails++
+				showLog(`checkFile:downloadData(${prefix}) RETRY err ${err2}`)
+				addFailure('file', prefix, entry, `RETRY(${err2.toString()})`)
+			}
+		}
+	}
+	else {
+		pinnedFiles++
+		showLog(`${indent}${prefix} pin exists, skipping download!`)
 	}
 }
 
 async function processNodeOrValue(storageLoader: StorageLoader, what: string, manifestOnly: Boolean, loadFiles: Boolean, saveFiles: Boolean) : Promise<Boolean>
 {
 	var node: pendingNode | undefined
+	let got = 'none'
 	if (pendingNodes.length > 0 && !loadFiles) {
 		node = pendingNodes.shift()
+		got = 'node'
 	} else if (pendingValues.length > 0 && (pendingFiles.length < 200 || pendingNodes.length == 0)) {
 		node = pendingValues.shift()
+		got = 'value'
 	} else if (pendingNodes.length > 0) {
 		node = pendingNodes.shift()
+		got = 'node'
 	}
 	if (node && !exitRequested) {
 		var running = true
+		nodesActive++
+		if (got == 'value') {
+			if (pendingFiles.length > RetrievableMax*LookaheadFactor) {
+				nodesSleeping++
+				while (pendingFiles.length > RetrievableMax*LookaheadFactor) await sleep(1000)
+				nodesSleeping--
+			}
+		} else if (got == 'node') {
+			if (pendingValues.length > RetrievableMax*LookaheadFactor) {
+				nodesSleeping++
+				while (pendingValues.length > RetrievableMax*LookaheadFactor) await sleep(1000)
+				nodesSleeping--
+			}
+		}
 		const timeout = setTimeout(async () => {
 						if (!exitRequested && !Holding && nodesRunning < RetrievableMax) {
 							nodesRunning++
@@ -426,7 +521,6 @@ async function processNodeOrValue(storageLoader: StorageLoader, what: string, ma
 							nodesRunning--
 						}
 					}, 6000);	// Longer than 6 seconds, spawn a parallel thread
-		nodesActive++
 		await printAllForks(storageLoader, node.node, node.node.getEntry, node.prefix, node.indent, what, undefined, node.excludes, manifestOnly, loadFiles, saveFiles);
 		clearTimeout(timeout)
 		nodesActive--
@@ -446,7 +540,11 @@ async function processNodes(storageLoader: StorageLoader, what: string, manifest
 			await processNodeOrValue(storageLoader, what, manifestOnly, loadFiles, saveFiles)
 			if (exitRequested) { pendingNodes = [] }
 		}
-		if (!exitRequested) await sleep(1000)
+		if (!exitRequested) {
+			nodesSleeping++
+			await sleep(1000)
+			nodesSleeping--
+		}
 		else printStatus(`processNodes:${nodesRunning} running, ${pendingNodes.length}+${pendingValues.length} pending`)
 		elapsed = Math.trunc((new Date().getTime() - start)/1000+0.5)
 	}
@@ -462,6 +560,12 @@ async function processValue(storageLoader: StorageLoader, what: string, manifest
 	}
 	if (node && !exitRequested) {
 		var running = true
+		nodesActive++
+		if (pendingFiles.length > RetrievableMax*LookaheadFactor) {
+			valuesSleeping++
+			while (pendingFiles.length > RetrievableMax*LookaheadFactor) await sleep(1000)
+			valuesSleeping--
+		}
 		const timeout = setTimeout(async () => {
 						if (!exitRequested && !Holding && valuesRunning < RetrievableMax) {
 							valuesRunning++
@@ -471,7 +575,6 @@ async function processValue(storageLoader: StorageLoader, what: string, manifest
 							valuesRunning--
 						}
 					}, 6000);	// Longer than 6 seconds, spawn a parallel thread
-		nodesActive++
 		await printAllForks(storageLoader, node.node, node.node.getEntry, node.prefix, node.indent, what, undefined, node.excludes, manifestOnly, loadFiles, saveFiles);
 		clearTimeout(timeout)
 		nodesActive--
@@ -491,7 +594,16 @@ async function processValues(storageLoader: StorageLoader, what: string, manifes
 			await processValue(storageLoader, what, manifestOnly, loadFiles, saveFiles)
 			if (exitRequested) { pendingValues = [] }
 		}
-		if (!exitRequested) await sleep(1000)
+
+		if (!exitRequested) {
+			valuesSleeping++
+			await sleep(1000)
+			valuesSleeping--
+		} else if (pendingValues.length <= 0) {
+			valuesSleeping++
+			await sleep(100)
+			valuesSleeping--
+		}
 		else printStatus(`processValues:${nodesRunning} running, ${pendingValues.length} pending`)
 		await sleep(100)
 		elapsed = Math.trunc((new Date().getTime() - start)/1000+0.5)
@@ -533,7 +645,9 @@ async function processFiles(what: string, loadFiles: Boolean, saveFiles: Boolean
 			if (exitRequested) pendingFiles = []
 		}
 		if (exitRequested) printStatus(`processFiles waiting for ${nodesRunning} nodes`)
+		filesSleeping++
 		await sleep(100);
+		filesSleeping--
 	}
 	filesRunning--
 }
@@ -549,14 +663,27 @@ async function printAllForks(storageLoader: StorageLoader, node: MantarayNode, r
 	if (exitRequested) return
 	
 	try {
+		checkNodes++
 		await node.load(storageLoader, reference)
 		await pinReference(bytesToHex(reference), 'node', prefix)	// Only pin it after a successful load!
 	}
 	catch (err: any) {
+		nodeFails++
 		var badAddr = bytesToHex(reference)
 		showBoth(`printAllForks: Failed to load ${prefix} address ${badAddr} ${err}`);
 		addFailure('node', prefix, badAddr, err.toString())
-		return
+		await sleep(1000)
+		try {
+			await node.load(storageLoader, reference)
+			addFailure('node', prefix, badAddr, `Recovered(${err.toString()})`)
+			await pinReference(bytesToHex(reference), 'node', prefix)	// Only pin it after a successful load!
+		}
+		catch (err2: any) {
+			node2Fails++
+			showBoth(`printAllForks: RETRY Failed to load ${prefix} address ${badAddr} ${err2}`);
+			addFailure('node', prefix, badAddr, `RETRY(${err2.toString()})`)
+			return
+		}
 	}
 
 	var types = "";
@@ -829,6 +956,7 @@ process.stdin.on('keypress', (str, key) => {
 	}
 })
 
+	refreshReupload()	// Prime the display pump
 
 //	For uploading a straight directory set with an index.html
 //	const rootNode = await newManifest(saveFunction, srcDir, "index.html")
@@ -844,9 +972,15 @@ process.stdin.on('keypress', (str, key) => {
 //	This will dump out the uploaded manifest for diagnostic purposes
 	await dumpManifest(loadFunction, rootReference, "manifest", undefined, undefined, false, true, false)
 	
+	refreshReupload(-1)	// Flush the final stats to the log file
+
 	showBoth(`FAILURES:`)
 	showFailures()
 	showBoth(`All DONE!`)
+
+	stopUploadRefresher = true
+	await uploadRefresher
+	showBoth('uploadRefresher terminated')
 
 //	showBoth(`TAG information may be viewed using curl ${beeUrl}/tags/${tagID} | jq`)
 //	showBoth(`View your archive at ${beeUrl}/bzz/${rootNode}`)
