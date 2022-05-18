@@ -487,13 +487,15 @@ async function processNodeOrValue(storageLoader: StorageLoader, what: string, ma
 	var node: pendingNode | undefined
 	let got = 'none'
 	if (pendingNodes.length > 0 && !loadFiles) {
-		node = pendingNodes.shift()
+		//node = pendingNodes.shift()
+		node = pendingNodes.pop()
 		got = 'node'
 	} else if (pendingValues.length > 0 && (pendingFiles.length < 200 || pendingNodes.length == 0)) {
 		node = pendingValues.shift()
 		got = 'value'
 	} else if (pendingNodes.length > 0) {
-		node = pendingNodes.shift()
+		//node = pendingNodes.shift()
+		node = pendingNodes.pop()
 		got = 'node'
 	}
 	if (node && !exitRequested) {
@@ -675,6 +677,7 @@ async function printAllForks(storageLoader: StorageLoader, node: MantarayNode, r
 		await sleep(1000)
 		try {
 			await node.load(storageLoader, reference)
+			showBoth(`printAllForks: got RETRY ${prefix} address ${badAddr} after ${err}`)
 			addFailure('node', prefix, badAddr, `Recovered(${err.toString()})`)
 			await pinReference(bytesToHex(reference), 'node', prefix)	// Only pin it after a successful load!
 		}
