@@ -39,7 +39,8 @@ axios.defaults.timeout = 30000	// Default of 30 second timeout
 //})
 
 const beeUrl = process.argv[3]
-const batchID = process.argv[4]
+const beeRecoveryUrl = process.argv[4]
+const batchID = process.argv[5]	// Not currently used
 
 var bee : Bee
 try {
@@ -317,6 +318,8 @@ const LookaheadFactor = 10
 const semaphorePin = new Semaphore(1);
 const semaphoreGetContent = new Semaphore(20);
 const semaphorePutContent = new Semaphore(20);
+const semaphoreReuploadNode = new Semaphore(10);
+const semaphoreReuploadFile = new Semaphore(10);
 
 var checkNodes = 0
 var checkFiles = 0
@@ -426,6 +429,68 @@ async function pinReference(reference: string, type: string, path: string) : Pro
 
 
 
+
+async function reupload(reference : string, what : string = "*unknown*", retries : number = 10) : Promise<Boolean> {
+	if (!beeRecoveryUrl) return false
+	if (beeRecoveryUrl == '') return false
+	var status = void(0)	// undefined
+	showLog(`reupload ${reference} ${what} queued`)
+	for (let retry=0; retry<retries; retry++) {
+		const isNode = (what.substring(0,5) == 'node(')
+		var sem = isNode ? semaphoreReuploadNode : semaphoreReuploadFile
+		var start = new Date().getTime()
+		if (isNode) pendNodes++; else pendFiles++
+		refreshReupload()
+		const [value, release] = await sem.acquire();
+		var elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
+		try {
+			showLog(`reuploading ${reference} ${what} retry:${retry} after ${elapsed} seconds sem acquire`)
+			start = new Date().getTime()
+			// Can't use bee-js's ??? because it first checks that the reference is pinned!
+			status = await executeAPI(beeRecoveryUrl, 'stewardship', 'put', reference)
+			//console.log( status )
+			elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
+			if (retry == 0) 
+				showLog(`reupload ${reference} ${what} retry:${retry} status:${JSON.stringify(status)} elapsed ${elapsed} seconds`)
+			else showBoth(`reupload ${reference} ${what} retry:${retry} status:${JSON.stringify(status)} elapsed ${elapsed} seconds`)
+		}
+		catch (err) {
+			elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
+			showBoth(`reupload ${reference} ${what} retry:${retry} failed in ${elapsed} seconds with ${err}`)
+			//throw err
+		}
+		finally {
+			release();
+			if (isNode) doneNodes++; else doneFiles++
+			refreshReupload()
+		}
+		if (status) {
+			try {
+				start = new Date().getTime()
+				await downloadData(reference, what)
+				elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
+				showLog(`reupload ${reference} ${what} downloadData succeeded in ${elapsed} seconds`)
+				return true;	// It worked!
+			}
+			catch (err) {
+				elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
+				showBoth(`reupload ${reference} ${what} downloadData failed with ${err} in ${elapsed} seconds`)
+				reuploadFailures++
+				refreshReupload()
+			}
+		} else {
+			reuploadFailures++
+			refreshReupload()
+		}
+	}
+	showBoth(`reupload ${reference} ${what} FAILED all retries!`)
+	return false;
+}
+
+
+
+
+
 const zeroAddress = '0000000000000000000000000000000000000000000000000000000000000000';
 
 type pendingFile = {
@@ -462,21 +527,26 @@ async function checkFile(entry: string, prefix: string, indent: string) {
 			showLog(`${indent}${prefix} got ${content.length} bytes`)
 			await pinReference(entry, 'file', prefix)
 		} catch (err: any) {
-			for (let r=1; r<=30; r++) {
-			fileFails++
-			showLog(`checkFile:downloadData(${prefix}) err ${err}`)
-			addFailure('file', prefix, entry, `${r}:err.toString()`)
-			await sleep(r*1000)
-			try {
-				const content2 = await downloadData(entry, prefix)
-				addFailure('file', prefix, entry, `Recovered:${r}(${err.toString()})`)
-				showLog(`${indent}${prefix} got RETRY ${r} ${content2.length} bytes after ${err}`)
-				await pinReference(entry, 'file', prefix)
-				err = null
-				break;
-			} catch (err2: any) {
-				err = err2
+
+			if (!await reupload(entry, `file(${prefix})`)) {
+				showBoth(`checkFile: Recovery FAILED ${prefix} address ${entry}`)
 			}
+
+			for (let r=1; r<=30; r++) {
+				fileFails++
+				showLog(`checkFile:downloadData(${prefix}) err ${err}`)
+				addFailure('file', prefix, entry, `${r}:err.toString()`)
+				await sleep(r*1000)
+				try {
+					const content2 = await downloadData(entry, prefix)
+					addFailure('file', prefix, entry, `Recovered:${r}(${err.toString()})`)
+					showLog(`${indent}${prefix} got RETRY ${r} ${content2.length} bytes after ${err}`)
+					await pinReference(entry, 'file', prefix)
+					err = null
+					break;
+				} catch (err2: any) {
+					err = err2
+				}
 			}
 			if (err) {
 				file2Fails++
@@ -680,6 +750,11 @@ async function printAllForks(storageLoader: StorageLoader, node: MantarayNode, r
 	}
 	catch (err: any) {
 		var badAddr = bytesToHex(reference)
+
+		if (!await reupload(badAddr, `node(${prefix})`)) {
+			showBoth(`printAllForks: Recovery FAILED ${prefix} address ${badAddr}`)
+		}
+
 		for (let r=1; r<=30; r++) {
 		nodeFails++
 		showBoth(`printAllForks: Failed to load ${prefix} address ${badAddr} ${err}`);
@@ -699,7 +774,7 @@ async function printAllForks(storageLoader: StorageLoader, node: MantarayNode, r
 		}
 		if (err) {
 			node2Fails++
-                        showBoth(`printAllForks: RETRY Failed to load ${prefix} address ${badAddr} ${err}`);
+                        showBoth(`printAllForks: RETRY err ${prefix} address ${badAddr} ${err}`);
                         addFailure('node', prefix, badAddr, `RETRY(${err.toString()})`)
                         return
 		}
