@@ -447,11 +447,11 @@ async function reupload(reference : string, what : string = "*unknown*", retries
 			showLog(`reuploading ${reference} ${what} retry:${retry} after ${elapsed} seconds sem acquire`)
 			start = new Date().getTime()
 			// Can't use bee-js's ??? because it first checks that the reference is pinned!
-			status = await executeAPI(beeRecoveryUrl, 'stewardship', 'put', reference)
+			status = await executeAPI(beeRecoveryUrl, 'stewardship', reference, 'put')
 			//console.log( status )
 			elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
 			if (retry == 0) 
-				showLog(`reupload ${reference} ${what} retry:${retry} status:${JSON.stringify(status)} elapsed ${elapsed} seconds`)
+				showBoth(`reupload ${reference} ${what} retry:${retry} status:${JSON.stringify(status)} elapsed ${elapsed} seconds`)
 			else showBoth(`reupload ${reference} ${what} retry:${retry} status:${JSON.stringify(status)} elapsed ${elapsed} seconds`)
 		}
 		catch (err) {
