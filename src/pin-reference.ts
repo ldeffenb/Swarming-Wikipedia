@@ -18,7 +18,7 @@ const axios = require('axios')
 axios.default
 axios.defaults.httpAgent = httpAgent
 axios.defaults.httpsAgent = httpsAgent
-axios.defaults.timeout = 10000	// Default of 10 second timeout
+axios.defaults.timeout = 30000	// Default of 30 second timeout
 
 //import { buildAxiosFetch } from '@lifeomic/axios-fetch'
 
@@ -98,6 +98,7 @@ function showError(text : string)
 {
 	//process.stderr.clearLine(1);
 	console.error('\u001b[K'+currentLocalTime()+' '+text)
+	if (uploadRefresher) refreshReupload()
 }
 
 function showLog(text : string)
@@ -342,6 +343,7 @@ async function reuploadRefresher() {
 		await sleep(1000)
 		refreshReupload()
 	}
+	refreshReupload(-1)
 }
 
 function refreshReupload(total?:number) {
@@ -460,19 +462,26 @@ async function checkFile(entry: string, prefix: string, indent: string) {
 			showLog(`${indent}${prefix} got ${content.length} bytes`)
 			await pinReference(entry, 'file', prefix)
 		} catch (err: any) {
+			for (let r=1; r<=30; r++) {
 			fileFails++
 			showLog(`checkFile:downloadData(${prefix}) err ${err}`)
-			addFailure('file', prefix, entry, err.toString())
-			await sleep(1000)
+			addFailure('file', prefix, entry, `${r}:err.toString()`)
+			await sleep(r*1000)
 			try {
 				const content2 = await downloadData(entry, prefix)
-				addFailure('file', prefix, entry, `Recovered(${err.toString()})`)
-				showLog(`${indent}${prefix} got RETRY ${content2.length} bytes after ${err}`)
+				addFailure('file', prefix, entry, `Recovered:${r}(${err.toString()})`)
+				showLog(`${indent}${prefix} got RETRY ${r} ${content2.length} bytes after ${err}`)
 				await pinReference(entry, 'file', prefix)
+				err = null
+				break;
 			} catch (err2: any) {
+				err = err2
+			}
+			}
+			if (err) {
 				file2Fails++
-				showLog(`checkFile:downloadData(${prefix}) RETRY err ${err2}`)
-				addFailure('file', prefix, entry, `RETRY(${err2.toString()})`)
+                                showLog(`checkFile:downloadData(${prefix}) RETRY err ${err}`)
+                                addFailure('file', prefix, entry, `RETRY(${err.toString()})`)
 			}
 		}
 	}
@@ -670,22 +679,29 @@ async function printAllForks(storageLoader: StorageLoader, node: MantarayNode, r
 		await pinReference(bytesToHex(reference), 'node', prefix)	// Only pin it after a successful load!
 	}
 	catch (err: any) {
-		nodeFails++
 		var badAddr = bytesToHex(reference)
+		for (let r=1; r<=30; r++) {
+		nodeFails++
 		showBoth(`printAllForks: Failed to load ${prefix} address ${badAddr} ${err}`);
-		addFailure('node', prefix, badAddr, err.toString())
-		await sleep(1000)
+		addFailure('node', prefix, badAddr, `${r}:err.toString()`)
+		await sleep(r*1000)
 		try {
 			await node.load(storageLoader, reference)
-			showBoth(`printAllForks: got RETRY ${prefix} address ${badAddr} after ${err}`)
-			addFailure('node', prefix, badAddr, `Recovered(${err.toString()})`)
+			showBoth(`printAllForks: got RETRY ${r} ${prefix} address ${badAddr} after ${err}`)
+			addFailure('node', prefix, badAddr, `Recovered:${r}(${err.toString()})`)
 			await pinReference(bytesToHex(reference), 'node', prefix)	// Only pin it after a successful load!
+			err = null
+			break;
 		}
 		catch (err2: any) {
+			err = err2
+		}
+		}
+		if (err) {
 			node2Fails++
-			showBoth(`printAllForks: RETRY Failed to load ${prefix} address ${badAddr} ${err2}`);
-			addFailure('node', prefix, badAddr, `RETRY(${err2.toString()})`)
-			return
+                        showBoth(`printAllForks: RETRY Failed to load ${prefix} address ${badAddr} ${err}`);
+                        addFailure('node', prefix, badAddr, `RETRY(${err.toString()})`)
+                        return
 		}
 	}
 
