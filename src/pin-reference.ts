@@ -20,6 +20,9 @@ axios.defaults.httpAgent = httpAgent
 axios.defaults.httpsAgent = httpsAgent
 axios.defaults.timeout = 30000	// Default of 30 second timeout
 
+
+const DeletePins = false
+
 //import { buildAxiosFetch } from '@lifeomic/axios-fetch'
 
 //const fetch = buildAxiosFetch(axios)
@@ -406,11 +409,27 @@ async function createPin(reference: string) : Promise<boolean> {
 	return false
 }
 
+async function deletePin(reference: string) : Promise<boolean> {
+        try {
+                const pin = await executeAPI(beeUrl, 'pins', `${reference}`, 'delete')
+                //showBoth(`Deleted Pin for ${reference}`)
+                if (pin) return true
+        } catch (err) {
+                //showBoth(`deletePin(${reference}) got ${err}`)
+        }
+        return false
+}
+
 async function pinReference(reference: string, type: string, path: string) : Promise<boolean> {
 	const [value, release] = await semaphorePin.acquire();
 	try {
-		printStatus(`Checking pin ${type} ${path} at ${reference}`)
-		if (await getPin(reference)) return true
+		if (DeletePins) {
+                	printStatus(`Deleting pin ${type} ${path} at ${reference}`)
+                	await deletePin(reference)
+		} else {
+			printStatus(`Checking pin ${type} ${path} at ${reference}`)
+			if (await getPin(reference)) return true
+		}
 		printStatus(`Actually pinning ${type} ${path} at ${reference}`)
 		const result = createPin(reference)
 		if (await result) {
@@ -520,7 +539,7 @@ let nodesActive = 0;
 const queueing = true
 
 async function checkFile(entry: string, prefix: string, indent: string) {
-	if (!await getPin(entry)) {
+	if (DeletePins || !await getPin(entry)) {
 		try {
 			checkFiles++
 			const content = await downloadData(entry, prefix)
