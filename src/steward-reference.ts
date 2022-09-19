@@ -266,7 +266,14 @@ async function executeAPI(URL : string, API : string, params : string = '', meth
 										httpAgent: httpAgent,
 										httpsAgent: httpsAgent,
 										maxContentLength: Infinity,
-										maxBodyLength: Infinity })
+										maxBodyLength: Infinity,
+										maxRedirects: 0 })
+		if (response.status != 200) {
+			showBoth(doing+' got status '+response.status+' '+response.statusText)
+			if (response.status == 301) {
+				showBoth(doing+' => '+response.headers['Location'])
+			}
+		}
 	}
 	catch (err:any)
 	{
@@ -274,13 +281,13 @@ async function executeAPI(URL : string, API : string, params : string = '', meth
 			var elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
 			if (err.response)
 			{	//showError(actualURL)
-				showError(doing+' '+elapsed+'s response error '+err+' with '+JSON.stringify(err.response.data))
+				showBoth(doing+' '+elapsed+'s response error '+err+' with '+JSON.stringify(err.response.data))
 				//showError(JSON.stringify(err.response.data))
 			} else if (err.request)
-			{	showError(doing+' '+elapsed+'s request error '+err)
+			{	showBoth(doing+' '+elapsed+'s request error '+err)
 				//showError(JSON.stringify(err.request))
 			} else
-			{	showError(doing+' '+elapsed+'s other error '+err)
+			{	showBoth(doing+' '+elapsed+'s other error '+err)
 				//showError(JSON.stringify(err))
 			}
 		}
@@ -517,7 +524,7 @@ async function reupload(reference : string, what : string = "*unknown*", retries
 async function isRetrievable(reference : string, what : string = "*unknown*", retries : number = 10) : Promise<Boolean> {
 	const isNode = (what.substring(0,5) == 'node(')
 	if (! beeUrl ||  beeUrl == '') {
-		if (isNode) checkNodes++; else checkFiles++
+		//if (isNode) checkNodes++; else checkFiles++
 		return true	// Assume the best since we cannot check
 	}
 	var status:any = void(0)	// undefined
@@ -536,7 +543,7 @@ async function isRetrievable(reference : string, what : string = "*unknown*", re
 			elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
 			if (status.isRetrievable) {
 				if (retry > 0) printStatus(`isRetrievable ${reference} ${what} retry:${retry} status:${JSON.stringify(status)} elapsed ${elapsed} seconds`)
-				if (isNode) checkNodes++; else checkFiles++
+				//if (isNode) checkNodes++; else checkFiles++
 				//refreshReupload()
 				return true
 			}
