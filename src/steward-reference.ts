@@ -552,7 +552,7 @@ async function isRetrievable(reference : string, what : string = "*unknown*", re
 		catch (err) {
 			elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
 			showBoth(`isRetrievable ${reference} ${what} failed with ${err} in ${elapsed} seconds`)
-			throw err
+			//throw err
 		}
 		finally {
 			release();
@@ -1065,7 +1065,7 @@ async function downloadData(address: string, what : string = "*unknown*") : Prom
 		//content = await bee.downloadData(address)
 		content = await executeBinaryAPI(beeUrl, 'bytes', address)
 		bytes = content.length
-		if (bytes == 0) throw new Error('Zero Bytes Read');
+		if (bytes == 0 && address != "b34ca8c22b9e982354f9c7f50b470d66db428d880c8a904d5fe4ec9713171526" ) throw new Error('Zero Bytes Read');
 		//var content = await executeAPI(beeUrl, 'bytes', 'get', address)
 	}
 	catch (err) {
