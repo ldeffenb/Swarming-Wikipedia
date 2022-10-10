@@ -552,7 +552,7 @@ async function isRetrievable(reference : string, what : string = "*unknown*", re
 		catch (err) {
 			elapsed = Math.trunc((new Date().getTime() - start)/100+0.5)/10.0
 			showBoth(`isRetrievable ${reference} ${what} failed with ${err} in ${elapsed} seconds`)
-			throw err
+			//throw err
 		}
 		finally {
 			release();
