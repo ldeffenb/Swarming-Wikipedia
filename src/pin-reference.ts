@@ -554,7 +554,7 @@ async function checkFile(entry: string, prefix: string, indent: string) {
 			for (let r=1; r<=30; r++) {
 				fileFails++
 				showLog(`checkFile:downloadData(${prefix}) err ${err}`)
-				addFailure('file', prefix, entry, `${r}:err.toString()`)
+				addFailure('file', prefix, entry, `${r}:${err.toString()}`)
 				await sleep(r*1000)
 				try {
 					const content2 = await downloadData(entry, prefix)
@@ -777,7 +777,7 @@ async function printAllForks(storageLoader: StorageLoader, node: MantarayNode, r
 		for (let r=1; r<=30; r++) {
 		nodeFails++
 		showBoth(`printAllForks: Failed to load ${prefix} address ${badAddr} ${err}`);
-		addFailure('node', prefix, badAddr, `${r}:err.toString()`)
+		addFailure('node', prefix, badAddr, `${r}:${err.toString()}`)
 		await sleep(r*1000)
 		try {
 			await node.load(storageLoader, reference)
