@@ -113,3 +113,9 @@ and of course to my long time supporting the development of the [swarm](https://
 - Better styling of the generated index of A/ documents (currently hard-coded at 3 columns)
 - Remove redundancy of mis-speeled (sic) redirect files in the generated index
 - Use of zimlib rather than zimdump might make a few things easier to accomplish, but the bounty specified using zimdump.
+
+## Build hints
+
+- `npm install` then `npm run build` if you want to use it outside of docker
+- If you get errors about browserslist being out of date, try `export BROWSERSLIST_IGNORE_OLD_DATA=true`
+- If you get errors about unsupported digital envelope routines, try `export NODE_OPTIONS=--openssl-legacy-provider`
