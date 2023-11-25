@@ -44,6 +44,8 @@ const DeletePins = false
 const beeUrls = process.argv[3].split(',')
 const beeRecoveryUrl = process.argv[4]
 const batchID = process.argv[5]	// Not currently used
+const filters = process.argv[6]	// '0/,1/,2/,3/,...'
+const excludes = process.argv[7]	// Ditto the format for filters
 
 showBoth(`Have ${beeUrls.length} retrieval URLs`)
 function beeUrl() {
@@ -64,6 +66,7 @@ const uploadDelay = 0	// msec to sleep after each upload to give node a chance t
 
 var exitRequested = false
 var Holding = false
+var HoldReason : string = ''
 
 async function waitForHold(what:string) {
 	if (Holding) {
@@ -223,6 +226,7 @@ async function executeBinaryAPI(URL : string, API : string, params : string = ''
 		//var response = await axios({ method: method, url: actualURL, headers: headers, data: body })
 		var response = await axios({ method: method, url: actualURL,
 										headers: headers, data: body,
+										timeout: 60000,
 										responseType: 'arraybuffer',
 										httpAgent: httpAgent,
 										httpsAgent: httpsAgent,
@@ -237,8 +241,15 @@ async function executeBinaryAPI(URL : string, API : string, params : string = ''
 			showError(doing+' '+elapsed+'s response error '+err+' with '+JSON.stringify(err.response.data))
 			//showError(JSON.stringify(err.response.data))
 		} else if (err.request)
-		{	showError(doing+' '+elapsed+'s request error '+err)
-			//showError(JSON.stringify(err.request))
+		{
+			const errString = err.toString()
+			if ((errString.includes('timeout of') && errString.includes('exceeded'))
+			|| errString.includes('ETIMEDOUT')
+			|| errString.includes('ECONNREFUSED')) {
+				Holding = true
+				HoldReason = `Holding due to ${errString}`
+				showBoth(HoldReason)
+			}
 		} else
 		{	showError(doing+' '+elapsed+'s other error '+err)
 			//showError(JSON.stringify(err))
@@ -270,6 +281,7 @@ async function executeAPI(URL : string, API : string, params : string = '', meth
 		//var response = await axios({ method: method, url: actualURL, headers: headers, data: body })
 		var response = await axios({ method: method, url: actualURL,
 										headers: headers, data: body,
+										timeout: 60000,
 										httpAgent: httpAgent,
 										httpsAgent: httpsAgent,
 										maxContentLength: Infinity,
@@ -293,6 +305,14 @@ async function executeAPI(URL : string, API : string, params : string = '', meth
 			} else if (err.request)
 			{	showBoth(doing+' '+elapsed+'s request error '+err)
 				//showError(JSON.stringify(err.request))
+				const errString = err.toString()
+				if ((errString.includes('timeout of') && errString.includes('exceeded'))
+				|| errString.includes('ETIMEDOUT')
+				|| errString.includes('ECONNREFUSED')) {
+					Holding = true
+					HoldReason = `Holding due to ${errString}`
+					showBoth(HoldReason)
+				}
 			} else
 			{	showBoth(doing+' '+elapsed+'s other error '+err)
 				//showError(JSON.stringify(err))
@@ -1141,11 +1161,16 @@ process.stdin.on('keypress', (str, key) => {
 			//showBoth(`You pressed the "${str}" key`)
 			if (str == 'H' && !Holding) {
 				Holding = true
+				HoldReason = 'Keyboard Initiated'
 				showBoth("Initiating HOLD")
 			} else if (str == 'R' && Holding) {
 				Holding = false
+				HoldReason = ''
 				showBoth("Resuming from HOLD")
-			} else showBoth(`Use H for HOLD and R for RESUME, you pressed "${str}"`)
+			} else {
+				showBoth(`Use H for HOLD and R for RESUME, you pressed "${str}"`)
+				if (HoldReason != '') showBoth(`Holding for ${HoldReason}`)
+			}
 		}	
 	}
 })
@@ -1164,7 +1189,18 @@ process.stdin.on('keypress', (str, key) => {
 //	const rootNode = "9aafea948007399891290fc3b294fdfbbf7f51313111dd20ba2bb6ff2a1ecd27"
 
 //	This will dump out the uploaded manifest for diagnostic purposes
-	await dumpManifest(beeUrl(), rootReference, "manifest", undefined, undefined, false, true, false)
+	var actualExcludes = undefined
+	if (excludes != undefined && excludes != '') {
+		showBoth(`Excluding ${excludes}`)
+		actualExcludes = excludes.split(',')
+	}
+	if (filters != undefined && filters != '') {
+		showBoth(`Processing ${filters}`)
+		const parsed = filters.split(',')
+		for (let f = 0; f < parsed.length; f++)
+			await dumpManifest(beeUrl(), rootReference, "manifest", parsed[f], actualExcludes, false, true, false)
+	} else
+		await dumpManifest(beeUrl(), rootReference, "manifest", undefined, actualExcludes, false, true, false)
 	
 	refreshReupload(-1)	// Flush the final stats to the log file
 
